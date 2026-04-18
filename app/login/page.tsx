@@ -17,13 +17,91 @@ export default function LoginPage() {
     event.preventDefault();
     setError(null);
     setLoadingAction(mode);
+    // #region agent log
+    fetch("http://127.0.0.1:7507/ingest/84f0df0a-ab44-4404-9c1f-d1e8e11b9674", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "fd6d71" },
+      body: JSON.stringify({
+        sessionId: "fd6d71",
+        runId: "pre-fix",
+        hypothesisId: "H1_H3",
+        location: "app/login/page.tsx:20",
+        message: "onSubmit start",
+        data: { mode, hasEmail: email.length > 0, passwordLength: password.length },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
 
     const supabase = createSupabaseBrowserClient();
-    const fn =
-      mode === "signin" ? supabase.auth.signInWithPassword : supabase.auth.signUp;
-    const { error: authError } = await fn({ email, password });
+    // #region agent log
+    fetch("http://127.0.0.1:7507/ingest/84f0df0a-ab44-4404-9c1f-d1e8e11b9674", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "fd6d71" },
+      body: JSON.stringify({
+        sessionId: "fd6d71",
+        runId: "post-fix",
+        hypothesisId: "H1",
+        location: "app/login/page.tsx:32",
+        message: "auth function references",
+        data: {
+          mode,
+          detachedCall: false,
+          signInFnType: typeof supabase.auth.signInWithPassword,
+          signUpFnType: typeof supabase.auth.signUp,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+    let authError: { message: string } | null = null;
+    try {
+      const result =
+        mode === "signin"
+          ? await supabase.auth.signInWithPassword({ email, password })
+          : await supabase.auth.signUp({ email, password });
+      authError = result.error;
+    } catch (caught) {
+      // #region agent log
+      fetch("http://127.0.0.1:7507/ingest/84f0df0a-ab44-4404-9c1f-d1e8e11b9674", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "fd6d71" },
+        body: JSON.stringify({
+          sessionId: "fd6d71",
+          runId: "pre-fix",
+          hypothesisId: "H1_H2",
+          location: "app/login/page.tsx:57",
+          message: "auth call threw",
+          data: {
+            mode,
+            errorName:
+              caught instanceof Error ? caught.name : "unknown",
+            errorMessage:
+              caught instanceof Error ? caught.message : String(caught),
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+      throw caught;
+    }
 
     if (authError) {
+      // #region agent log
+      fetch("http://127.0.0.1:7507/ingest/84f0df0a-ab44-4404-9c1f-d1e8e11b9674", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "fd6d71" },
+        body: JSON.stringify({
+          sessionId: "fd6d71",
+          runId: "pre-fix",
+          hypothesisId: "H4",
+          location: "app/login/page.tsx:75",
+          message: "auth call returned error",
+          data: { mode, authError: authError.message },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       setError(authError.message);
       setLoadingAction(null);
       return;

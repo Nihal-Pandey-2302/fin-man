@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Finance Terminal">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1d4ed8"/>
+      <stop offset="1" stop-color="#22c55e"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#09090b"/>
+  <rect x="48" y="48" width="416" height="416" rx="96" fill="url(#g)" opacity="0.95"/>
+  <path fill="#0b1220" d="M140 352V160h52v192H140zm90-96 86-96h64l-86 96 86 96h-64l-86-96zm150 96V160h52v192h-52z"/>
+</svg>

@@ -34,11 +34,15 @@ export function ExpensesManager({
   initialExpenses,
   initialCount,
   initialMonthFilter,
+  initialFromDate,
+  initialToDate,
 }: {
   accounts: Account[];
   initialExpenses: Expense[];
   initialCount: number;
   initialMonthFilter: string;
+  initialFromDate: string;
+  initialToDate: string;
 }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
@@ -50,6 +54,8 @@ export function ExpensesManager({
   const [editing, setEditing] = useState<Expense | null>(null);
   const [form, setForm] = useState(defaultForm);
   const [monthFilter, setMonthFilter] = useState(initialMonthFilter);
+  const [fromDate, setFromDate] = useState(initialFromDate);
+  const [toDate, setToDate] = useState(initialToDate);
   const [categoryFilter, setCategoryFilter] = useState("");
   const [accountFilter, setAccountFilter] = useState("");
 
@@ -70,7 +76,12 @@ export function ExpensesManager({
 
     if (categoryFilter) query = query.eq("category", categoryFilter);
     if (accountFilter) query = query.eq("account_id", accountFilter);
-    if (monthFilter) {
+    if (fromDate) {
+      query = query.gte("date", fromDate);
+    }
+    if (toDate) {
+      query = query.lte("date", toDate);
+    } else if (monthFilter) {
       const monthStart = `${monthFilter}-01`;
       const monthEndDate = new Date(`${monthStart}T00:00:00.000Z`);
       monthEndDate.setUTCMonth(monthEndDate.getUTCMonth() + 1);
@@ -200,15 +211,41 @@ export function ExpensesManager({
   return (
     <section className="space-y-4 pb-24">
       <header className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-        <h1 className="text-lg font-semibold">Expenses</h1>
-        <p className="mt-1 text-sm text-zinc-400">Track every rupee with account-linked balance updates.</p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-lg font-semibold">Expenses</h1>
+            <p className="mt-1 text-sm text-zinc-400">Track every rupee with account-linked balance updates.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              resetForm();
+              setOpenModal(true);
+            }}
+            className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-500"
+          >
+            Add Expense
+          </button>
+        </div>
       </header>
 
-      <div className="grid gap-2 rounded-xl border border-zinc-800 bg-zinc-900 p-3 md:grid-cols-4">
+      <div className="grid gap-2 rounded-xl border border-zinc-800 bg-zinc-900 p-3 md:grid-cols-6">
         <input
           type="month"
           value={monthFilter}
           onChange={(e) => setMonthFilter(e.target.value)}
+          className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
+        />
+        <input
+          type="date"
+          value={fromDate}
+          onChange={(e) => setFromDate(e.target.value)}
+          className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
+        />
+        <input
+          type="date"
+          value={toDate}
+          onChange={(e) => setToDate(e.target.value)}
           className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
         />
         <select

@@ -6,6 +6,7 @@ export const EXPENSE_CATEGORIES = [
   { key: "emi", label: "EMI", emoji: "🏦", colorClass: "text-red-400" },
   { key: "health", label: "Health", emoji: "💊", colorClass: "text-green-400" },
   { key: "education", label: "Education", emoji: "📚", colorClass: "text-yellow-300" },
+  { key: "investment", label: "Investment", emoji: "📈", colorClass: "text-emerald-400" },
   { key: "misc", label: "Misc", emoji: "⚪", colorClass: "text-zinc-300" },
 ] as const;
 

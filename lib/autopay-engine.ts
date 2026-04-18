@@ -1,6 +1,31 @@
 import { advanceDateByCycle } from "@/lib/finance-config";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+function localDateParts() {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  const today = `${yyyy}-${mm}-${dd}`;
+  const monthKey = `${yyyy}-${mm}`;
+  const dayOfMonth = now.getDate();
+  const lastDayOfMonth = new Date(yyyy, now.getMonth() + 1, 0).getDate();
+  return { today, monthKey, dayOfMonth, lastDayOfMonth };
+}
+
+type SipInvestment = {
+  id: string;
+  name: string;
+  is_sip: boolean;
+  sip_amount: number | null;
+  sip_date: number | null;
+  account_id: string | null;
+  sip_last_posted_month: string | null;
+  amount_invested: number;
+  current_value: number | null;
+  note: string | null;
+};
+
 type Subscription = {
   id: string;
   name: string;
@@ -13,6 +38,7 @@ type Subscription = {
 
 export async function runAutopayEngineForCurrentUser(supabase: SupabaseClient) {
   const today = new Date().toISOString().slice(0, 10);
+  const { today: sipToday, monthKey, dayOfMonth, lastDayOfMonth } = localDateParts();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -77,6 +103,74 @@ export async function runAutopayEngineForCurrentUser(supabase: SupabaseClient) {
 
     firedCount += 1;
     toastMessages.push(`INR ${Number(sub.amount).toFixed(2)} auto-deducted for ${sub.name}`);
+  }
+
+  const { data: sipInvestments, error: sipError } = await supabase
+    .from("investments")
+    .select(
+      "id, name, is_sip, sip_amount, sip_date, account_id, sip_last_posted_month, amount_invested, current_value, note"
+    )
+    .eq("user_id", user.id)
+    .eq("is_sip", true);
+
+  if (!sipError && sipInvestments?.length) {
+    for (const inv of sipInvestments as SipInvestment[]) {
+      const amount = Number(inv.sip_amount ?? 0);
+      const sipDay = inv.sip_date;
+      if (!amount || sipDay == null || sipDay < 1 || sipDay > 31) continue;
+      if (!inv.account_id) continue;
+      if (inv.sip_last_posted_month === monthKey) continue;
+
+      const effectiveSipDay = Math.min(sipDay, lastDayOfMonth);
+      if (dayOfMonth < effectiveSipDay) continue;
+
+      const { error: expenseError } = await supabase.from("expenses").insert({
+        user_id: user.id,
+        amount,
+        category: "investment",
+        currency: "INR",
+        subcategory: inv.name,
+        note: `SIP auto: ${inv.name}`,
+        date: sipToday,
+        account_id: inv.account_id,
+        investment_id: inv.id,
+        is_autopay: true,
+      });
+
+      if (expenseError) continue;
+
+      const { data: account } = await supabase
+        .from("accounts")
+        .select("balance")
+        .eq("id", inv.account_id)
+        .single();
+
+      if (account) {
+        await supabase
+          .from("accounts")
+          .update({ balance: Number(account.balance) - amount })
+          .eq("id", inv.account_id);
+      }
+
+      const nextInvested = Number(inv.amount_invested) + amount;
+      const baseCurrent = Number(inv.current_value ?? inv.amount_invested);
+      const nextCurrent = baseCurrent + amount;
+      const sipLine = `SIP: INR ${amount.toFixed(2)} on ${sipToday}`;
+      const nextNote = inv.note ? `${inv.note}\n${sipLine}` : sipLine;
+
+      await supabase
+        .from("investments")
+        .update({
+          amount_invested: nextInvested,
+          current_value: nextCurrent,
+          note: nextNote,
+          sip_last_posted_month: monthKey,
+        })
+        .eq("id", inv.id);
+
+      firedCount += 1;
+      toastMessages.push(`INR ${amount.toFixed(2)} SIP deducted for ${inv.name}`);
+    }
   }
 
   return { firedCount, toastMessages };

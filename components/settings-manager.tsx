@@ -6,7 +6,15 @@ import { EXPENSE_CATEGORIES } from "@/lib/finance-config";
 import { pushToast } from "@/lib/toast";
 
 type Account = { id: string; name: string };
-type Budget = { id: string; category: string; monthly_limit: number; month: number; year: number };
+type Budget = {
+  id: string;
+  category: string;
+  monthly_limit: number;
+  period: "daily" | "weekly" | "monthly";
+  period_start: string;
+  month?: number;
+  year?: number;
+};
 type Preset = { id: string; name: string; category: string; subcategory: string | null; note: string | null };
 type UserSettings = { id: string; default_account_id: string | null; currency: string };
 
@@ -31,12 +39,15 @@ export function SettingsManager({
   const [presetForm, setPresetForm] = useState(defaultPreset);
   const [budgetCategory, setBudgetCategory] = useState("food");
   const [budgetLimit, setBudgetLimit] = useState("0");
-  const [budgetMonth, setBudgetMonth] = useState(String(new Date().getMonth() + 1));
-  const [budgetYear, setBudgetYear] = useState(String(new Date().getFullYear()));
+  const [budgetPeriod, setBudgetPeriod] = useState<"daily" | "weekly" | "monthly">("monthly");
+  const [budgetStartDate, setBudgetStartDate] = useState(new Date().toISOString().slice(0, 10));
 
   const refresh = async () => {
     const [bRes, pRes, sRes] = await Promise.all([
-      supabase.from("budgets").select("id, category, monthly_limit, month, year").order("year", { ascending: false }),
+      supabase
+        .from("budgets")
+        .select("id, category, monthly_limit, period, period_start, month, year")
+        .order("period_start", { ascending: false }),
       supabase.from("quick_add_presets").select("id, name, category, subcategory, note").order("created_at", { ascending: false }),
       supabase.from("user_settings").select("id, default_account_id, currency").maybeSingle(),
     ]);
@@ -107,9 +118,11 @@ export function SettingsManager({
       user_id: userId,
       category: budgetCategory,
       monthly_limit: Number(budgetLimit),
-      month: Number(budgetMonth),
-      year: Number(budgetYear),
-    });
+      period: budgetPeriod,
+      period_start: budgetStartDate,
+      month: new Date(`${budgetStartDate}T00:00:00.000Z`).getUTCMonth() + 1,
+      year: new Date(`${budgetStartDate}T00:00:00.000Z`).getUTCFullYear(),
+    }, { onConflict: "user_id,category,period,period_start" });
     if (upsertError) {
       setError(upsertError.message);
       return;
@@ -144,20 +157,20 @@ export function SettingsManager({
   };
 
   return (
-    <section className="space-y-4">
-      <header className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+    <section className="space-y-5">
+      <header className="rounded-2xl border border-zinc-800/80 bg-gradient-to-r from-zinc-900 to-zinc-900/70 p-5">
         <h1 className="text-lg font-semibold">Settings</h1>
         <p className="mt-1 text-sm text-zinc-400">Quick-add presets, default account, budget limits, and export.</p>
       </header>
-      {error ? <p className="text-sm text-red-400">{error}</p> : null}
+      {error ? <p className="rounded-xl border border-red-900/70 bg-red-950/30 px-3 py-2 text-sm text-red-300">{error}</p> : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/90 p-4">
           <h2 className="text-sm font-semibold text-zinc-200">Default account</h2>
           <select
             value={settings?.default_account_id ?? ""}
             onChange={(e) => void saveDefaultAccount(e.target.value)}
-            className="mt-2 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
+            className="mt-2 w-full rounded-lg border border-zinc-700 bg-zinc-950/70 px-3 py-2 text-sm"
           >
             <option value="">None</option>
             {accounts.map((account) => (
@@ -166,27 +179,27 @@ export function SettingsManager({
               </option>
             ))}
           </select>
-          <button type="button" onClick={() => void exportCsv()} className="mt-3 rounded-md bg-blue-600 px-3 py-2 text-sm text-white">
+          <button type="button" onClick={() => void exportCsv()} className="mt-3 rounded-lg bg-blue-600 px-3 py-2 text-sm text-white transition hover:bg-blue-500">
             Export expenses CSV
           </button>
         </div>
 
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/90 p-4">
           <h2 className="text-sm font-semibold text-zinc-200">Add quick-add preset</h2>
           <form onSubmit={addPreset} className="mt-2 grid gap-2 md:grid-cols-2">
-            <input required placeholder="Preset name" value={presetForm.name} onChange={(e) => setPresetForm((p) => ({ ...p, name: e.target.value }))} className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm" />
-            <select value={presetForm.category} onChange={(e) => setPresetForm((p) => ({ ...p, category: e.target.value }))} className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm">
+            <input required placeholder="Preset name" value={presetForm.name} onChange={(e) => setPresetForm((p) => ({ ...p, name: e.target.value }))} className="rounded-lg border border-zinc-700 bg-zinc-950/70 px-3 py-2 text-sm" />
+            <select value={presetForm.category} onChange={(e) => setPresetForm((p) => ({ ...p, category: e.target.value }))} className="rounded-lg border border-zinc-700 bg-zinc-950/70 px-3 py-2 text-sm">
               {EXPENSE_CATEGORIES.map((category) => (
                 <option key={category.key} value={category.key}>{category.emoji} {category.label}</option>
               ))}
             </select>
-            <input placeholder="Subcategory" value={presetForm.subcategory} onChange={(e) => setPresetForm((p) => ({ ...p, subcategory: e.target.value }))} className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm" />
-            <input placeholder="Note" value={presetForm.note} onChange={(e) => setPresetForm((p) => ({ ...p, note: e.target.value }))} className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm" />
-            <button type="submit" className="rounded-md bg-blue-600 px-3 py-2 text-sm text-white md:col-span-2">Save preset</button>
+            <input placeholder="Subcategory" value={presetForm.subcategory} onChange={(e) => setPresetForm((p) => ({ ...p, subcategory: e.target.value }))} className="rounded-lg border border-zinc-700 bg-zinc-950/70 px-3 py-2 text-sm" />
+            <input placeholder="Note" value={presetForm.note} onChange={(e) => setPresetForm((p) => ({ ...p, note: e.target.value }))} className="rounded-lg border border-zinc-700 bg-zinc-950/70 px-3 py-2 text-sm" />
+            <button type="submit" className="rounded-lg bg-blue-600 px-3 py-2 text-sm text-white transition hover:bg-blue-500 md:col-span-2">Save preset</button>
           </form>
           <div className="mt-3 space-y-2">
             {presets.map((preset) => (
-              <div key={preset.id} className="flex items-center justify-between rounded-md border border-zinc-800 px-3 py-2 text-sm">
+              <div key={preset.id} className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm">
                 <span>{preset.name} • {preset.category} • {preset.subcategory ?? "general"}</span>
                 <button type="button" onClick={() => void deletePreset(preset.id)} className="rounded border border-red-800 px-2 py-1 text-xs text-red-300">Delete</button>
               </div>
@@ -195,23 +208,27 @@ export function SettingsManager({
         </div>
       </div>
 
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-        <h2 className="text-sm font-semibold text-zinc-200">Budget limits</h2>
+      <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/90 p-4">
+        <h2 className="text-sm font-semibold text-zinc-200">Budget limits (daily / weekly / monthly)</h2>
         <form onSubmit={addBudget} className="mt-2 grid gap-2 md:grid-cols-5">
-          <select value={budgetCategory} onChange={(e) => setBudgetCategory(e.target.value)} className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm">
+          <select value={budgetCategory} onChange={(e) => setBudgetCategory(e.target.value)} className="rounded-lg border border-zinc-700 bg-zinc-950/70 px-3 py-2 text-sm">
             {EXPENSE_CATEGORIES.map((category) => (
               <option key={category.key} value={category.key}>{category.label}</option>
             ))}
           </select>
-          <input type="number" step="0.01" value={budgetLimit} onChange={(e) => setBudgetLimit(e.target.value)} className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm" />
-          <input type="number" min={1} max={12} value={budgetMonth} onChange={(e) => setBudgetMonth(e.target.value)} className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm" />
-          <input type="number" min={2000} value={budgetYear} onChange={(e) => setBudgetYear(e.target.value)} className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm" />
-          <button type="submit" className="rounded-md bg-blue-600 px-3 py-2 text-sm text-white">Save budget</button>
+          <input type="number" step="0.01" value={budgetLimit} onChange={(e) => setBudgetLimit(e.target.value)} className="rounded-lg border border-zinc-700 bg-zinc-950/70 px-3 py-2 text-sm" />
+          <select value={budgetPeriod} onChange={(e) => setBudgetPeriod(e.target.value as "daily" | "weekly" | "monthly")} className="rounded-lg border border-zinc-700 bg-zinc-950/70 px-3 py-2 text-sm">
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+          <input type="date" value={budgetStartDate} onChange={(e) => setBudgetStartDate(e.target.value)} className="rounded-lg border border-zinc-700 bg-zinc-950/70 px-3 py-2 text-sm" />
+          <button type="submit" className="rounded-lg bg-blue-600 px-3 py-2 text-sm text-white transition hover:bg-blue-500">Save budget</button>
         </form>
         <div className="mt-3 space-y-2">
           {budgets.map((budget) => (
-            <div key={budget.id} className="rounded-md border border-zinc-800 px-3 py-2 text-sm text-zinc-200">
-              {budget.category} • INR {Number(budget.monthly_limit).toFixed(2)} • {budget.month}/{budget.year}
+            <div key={budget.id} className="rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-200">
+              {budget.category} • INR {Number(budget.monthly_limit).toFixed(2)} • {budget.period} from {budget.period_start}
             </div>
           ))}
         </div>

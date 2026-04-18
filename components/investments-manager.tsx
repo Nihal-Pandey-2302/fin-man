@@ -16,12 +16,15 @@ export type Investment = {
   is_sip: boolean;
   sip_amount: number | null;
   sip_date: number | null;
+  account_id: string | null;
+  sip_last_posted_month: string | null;
   note: string | null;
 };
 
-const TYPES = ["equity", "gold", "debt", "crypto", "fd", "other"];
+const TYPES = ["equity", "mutual_fund", "gold", "debt", "crypto", "fd", "other"];
 const TYPE_COLORS: Record<string, string> = {
   equity: "#10b981",
+  mutual_fund: "#22c55e",
   gold: "#f59e0b",
   debt: "#3b82f6",
   crypto: "#8b5cf6",
@@ -39,12 +42,15 @@ const defaultForm = {
   is_sip: false,
   sip_amount: "",
   sip_date: "",
+  account_id: "",
   note: "",
 };
 
 export function InvestmentsManager({
+  accounts,
   initialItems,
 }: {
+  accounts: { id: string; name: string }[];
   initialItems: Investment[];
 }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
@@ -52,12 +58,13 @@ export function InvestmentsManager({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(defaultForm);
   const [error, setError] = useState<string | null>(null);
+  const [topupAmount, setTopupAmount] = useState<Record<string, string>>({});
 
   const refresh = async () => {
     const { data, error: fetchError } = await supabase
       .from("investments")
       .select(
-        "id, name, type, platform, amount_invested, current_value, date, is_sip, sip_amount, sip_date, note"
+        "id, name, type, platform, amount_invested, current_value, date, is_sip, sip_amount, sip_date, account_id, sip_last_posted_month, note"
       )
       .order("date", { ascending: false });
     if (fetchError) {
@@ -77,6 +84,13 @@ export function InvestmentsManager({
       return;
     }
 
+    if (form.is_sip) {
+      if (!form.sip_amount.trim() || !form.sip_date.trim() || !form.account_id) {
+        setError("SIP requires amount, day of month, and an account to deduct from.");
+        return;
+      }
+    }
+
     const payload = {
       user_id: userId,
       name: form.name.trim(),
@@ -88,6 +102,7 @@ export function InvestmentsManager({
       is_sip: form.is_sip,
       sip_amount: form.is_sip && form.sip_amount ? Number(form.sip_amount) : null,
       sip_date: form.is_sip && form.sip_date ? Number(form.sip_date) : null,
+      account_id: form.is_sip && form.account_id ? form.account_id : null,
       note: form.note.trim() || null,
     };
 
@@ -115,6 +130,41 @@ export function InvestmentsManager({
     }
     await refresh();
     pushToast({ message: "Investment deleted", tone: "warning" });
+  };
+
+  const addToExistingInvestment = async (item: Investment) => {
+    setError(null);
+    const addAmount = Number(topupAmount[item.id] ?? "0");
+    if (addAmount <= 0) {
+      setError("Top-up amount must be greater than zero.");
+      return;
+    }
+
+    const nextInvested = Number(item.amount_invested) + addAmount;
+    const nextCurrent = Number(item.current_value ?? item.amount_invested) + addAmount;
+    const nextNote = item.note
+      ? `${item.note}\nTop-up: INR ${addAmount.toFixed(2)} on ${new Date()
+          .toISOString()
+          .slice(0, 10)}`
+      : `Top-up: INR ${addAmount.toFixed(2)} on ${new Date().toISOString().slice(0, 10)}`;
+
+    const { error: updateError } = await supabase
+      .from("investments")
+      .update({
+        amount_invested: nextInvested,
+        current_value: nextCurrent,
+        note: nextNote,
+      })
+      .eq("id", item.id);
+
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
+    setTopupAmount((prev) => ({ ...prev, [item.id]: "" }));
+    await refresh();
+    pushToast({ message: `Added INR ${addAmount.toFixed(2)} to ${item.name}`, tone: "success" });
   };
 
   const grouped = TYPES.map((type) => ({
@@ -165,7 +215,7 @@ export function InvestmentsManager({
         <input required placeholder="Name" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm" />
         <select value={form.type} onChange={(e) => setForm((p) => ({ ...p, type: e.target.value }))} className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm">
           {TYPES.map((type) => (
-            <option key={type} value={type}>{type}</option>
+            <option key={type} value={type}>{type.replaceAll("_", " ")}</option>
           ))}
         </select>
         <input placeholder="Platform" value={form.platform} onChange={(e) => setForm((p) => ({ ...p, platform: e.target.value }))} className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm" />
@@ -177,7 +227,20 @@ export function InvestmentsManager({
           SIP
         </label>
         <input type="number" step="0.01" value={form.sip_amount} onChange={(e) => setForm((p) => ({ ...p, sip_amount: e.target.value }))} placeholder="SIP amount" className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm" />
-        <input type="number" min={1} max={31} value={form.sip_date} onChange={(e) => setForm((p) => ({ ...p, sip_date: e.target.value }))} placeholder="SIP date" className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm" />
+        <input type="number" min={1} max={31} value={form.sip_date} onChange={(e) => setForm((p) => ({ ...p, sip_date: e.target.value }))} placeholder="Day of month (1–31)" className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm" />
+        <select
+          value={form.account_id}
+          onChange={(e) => setForm((p) => ({ ...p, account_id: e.target.value }))}
+          className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm md:col-span-2"
+          disabled={!form.is_sip}
+        >
+          <option value="">SIP deduct from account…</option>
+          {accounts.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.name}
+            </option>
+          ))}
+        </select>
         <input value={form.note} onChange={(e) => setForm((p) => ({ ...p, note: e.target.value }))} placeholder="Note" className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm md:col-span-2" />
         <button type="submit" className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white">{editingId ? "Update" : "Add Investment"}</button>
       </form>
@@ -197,6 +260,9 @@ export function InvestmentsManager({
                       Number(item.amount_invested) > 0
                         ? (itemPnl / Number(item.amount_invested)) * 100
                         : 0;
+                    const sipAccountName = item.account_id
+                      ? accounts.find((a) => a.id === item.account_id)?.name
+                      : null;
                     return (
                       <article key={item.id} className="rounded-md border border-zinc-800 bg-zinc-950 p-3">
                         <div className="flex items-center justify-between gap-2">
@@ -205,6 +271,13 @@ export function InvestmentsManager({
                             <p className="text-xs text-zinc-400">
                               {item.platform ?? "No platform"} - {item.date}
                             </p>
+                            {item.is_sip && item.sip_amount && item.sip_date ? (
+                              <p className="mt-1 text-xs text-cyan-300/90">
+                                SIP INR {Number(item.sip_amount).toFixed(2)} on day {item.sip_date}
+                                {sipAccountName ? ` · from ${sipAccountName}` : " · link account for auto-deduct"}
+                                {item.sip_last_posted_month ? ` · last run ${item.sip_last_posted_month}` : null}
+                              </p>
+                            ) : null}
                           </div>
                           <div className="text-right">
                             <p className="text-xs text-zinc-400">Invested {Number(item.amount_invested).toFixed(2)}</p>
@@ -229,6 +302,7 @@ export function InvestmentsManager({
                                 is_sip: item.is_sip,
                                 sip_amount: item.sip_amount ? String(item.sip_amount) : "",
                                 sip_date: item.sip_date ? String(item.sip_date) : "",
+                                account_id: item.account_id ?? "",
                                 note: item.note ?? "",
                               });
                             }}
@@ -240,6 +314,25 @@ export function InvestmentsManager({
                             Delete
                           </button>
                         </div>
+                        <div className="mt-2 grid gap-2 md:grid-cols-3">
+                          <input
+                            type="number"
+                            step="0.01"
+                            placeholder="Add amount"
+                            value={topupAmount[item.id] ?? ""}
+                            onChange={(e) =>
+                              setTopupAmount((prev) => ({ ...prev, [item.id]: e.target.value }))
+                            }
+                            className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => void addToExistingInvestment(item)}
+                            className="rounded-md bg-green-600 px-2 py-1 text-xs font-medium text-white"
+                          >
+                            Add Amount
+                          </button>
+                        </div>
                       </article>
                     );
                   })}
@@ -248,10 +341,10 @@ export function InvestmentsManager({
             ))}
           </div>
         </div>
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+        <div className="min-w-0 rounded-xl border border-zinc-800 bg-zinc-900 p-4">
           <h2 className="text-sm font-semibold text-zinc-200">Allocation by type</h2>
-          <div className="mt-3 h-72">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="mt-3 h-72 min-h-[18rem] min-w-0">
+            <ResponsiveContainer width="99%" height="100%">
               <PieChart>
                 <Pie data={allocation} dataKey="value" nameKey="name" innerRadius={60} outerRadius={95}>
                   {allocation.map((entry) => (

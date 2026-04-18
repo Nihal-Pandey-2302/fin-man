@@ -9,14 +9,16 @@ import type { AppToastEventDetail } from "@/lib/toast";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/accounts", label: "Accounts" },
   { href: "/expenses", label: "Expenses" },
+  { href: "/earnings", label: "Earnings" },
   { href: "/investments", label: "Investments" },
   { href: "/subscriptions", label: "Subscriptions" },
   { href: "/loans", label: "Loans" },
   { href: "/analytics", label: "Analytics" },
   { href: "/settings", label: "Settings" },
 ];
-const mobileNavItems = navItems.slice(0, 5);
+const mobileNavItems = navItems.slice(0, 6);
 
 function NavLink({ href, label }: { href: string; label: string }) {
   const pathname = usePathname();
@@ -113,7 +115,7 @@ export function AppShell({
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-zinc-800 bg-zinc-950/95 p-2 backdrop-blur md:hidden">
-        <div className="grid grid-cols-5 gap-1">
+        <div className="grid grid-cols-6 gap-1">
           {mobileNavItems.map((item) => (
             <NavLink key={item.href} {...item} />
           ))}

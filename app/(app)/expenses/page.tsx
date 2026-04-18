@@ -5,9 +5,8 @@ export default async function ExpensesPage() {
   const supabase = await createSupabaseServerClient();
   const monthFilter = new Date().toISOString().slice(0, 7);
   const monthStart = `${monthFilter}-01`;
-  const monthEndDate = new Date(`${monthStart}T00:00:00.000Z`);
-  monthEndDate.setUTCMonth(monthEndDate.getUTCMonth() + 1);
-  const monthEnd = monthEndDate.toISOString().slice(0, 10);
+  const initialFromDate = monthStart;
+  const initialToDate = new Date().toISOString().slice(0, 10);
 
   const { data: accounts } = await supabase
     .from("accounts")
@@ -19,8 +18,8 @@ export default async function ExpensesPage() {
     .select("id, amount, category, subcategory, note, date, account_id, is_autopay, account:accounts(name, currency)", {
       count: "exact",
     })
-    .gte("date", monthStart)
-    .lt("date", monthEnd)
+    .gte("date", initialFromDate)
+    .lte("date", initialToDate)
     .order("date", { ascending: false })
     .range(0, 19);
 
@@ -35,6 +34,8 @@ export default async function ExpensesPage() {
       initialExpenses={initialExpenses}
       initialCount={count ?? 0}
       initialMonthFilter={monthFilter}
+      initialFromDate={initialFromDate}
+      initialToDate={initialToDate}
     />
   );
 }

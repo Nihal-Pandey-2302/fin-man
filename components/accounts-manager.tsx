@@ -16,7 +16,7 @@ type Account = {
   created_at: string;
 };
 
-const accountTypes = ["bank", "cash", "wallet", "crypto"] as const;
+const accountTypes = ["bank", "cash", "wallet", "crypto", "ppf"] as const;
 
 const initialForm = {
   name: "",
@@ -121,13 +121,14 @@ export function AccountsManager({
     pushToast({ message: "Account deleted", tone: "warning" });
   };
 
-  const adjustBalance = async (account: Account) => {
+  const adjustBalance = async (account: Account, mode: "add" | "withdraw") => {
     setError(null);
-    const delta = Number(adjustValues[account.id] ?? "0");
+    const rawAmount = Number(adjustValues[account.id] ?? "0");
+    const delta = mode === "add" ? Math.abs(rawAmount) : -Math.abs(rawAmount);
     const note = (adjustNotes[account.id] ?? "").trim();
 
-    if (!delta || !note || !userId) {
-      setError("Adjustment amount and reason note are required.");
+    if (!rawAmount || !note || !userId) {
+      setError("Amount and reason note are required.");
       return;
     }
 
@@ -161,7 +162,10 @@ export function AccountsManager({
     setAdjustValues((prev) => ({ ...prev, [account.id]: "" }));
     setAdjustNotes((prev) => ({ ...prev, [account.id]: "" }));
     await loadAccounts();
-    pushToast({ message: "Balance adjusted", tone: "success" });
+    pushToast({
+      message: mode === "add" ? "Money added to account" : "Money withdrawn from account",
+      tone: "success",
+    });
   };
 
   return (
@@ -264,7 +268,7 @@ export function AccountsManager({
               <input
                 type="number"
                 step="0.01"
-                placeholder="Amount (+/-)"
+                placeholder="Amount"
                 value={adjustValues[account.id] ?? ""}
                 onChange={(e) =>
                   setAdjustValues((prev) => ({ ...prev, [account.id]: e.target.value }))
@@ -279,13 +283,22 @@ export function AccountsManager({
                 }
                 className="rounded-md border border-zinc-700 bg-zinc-950 px-2 py-1 text-xs md:col-span-2"
               />
-              <button
-                type="button"
-                onClick={() => void adjustBalance(account)}
-                className="rounded-md bg-yellow-600 px-2 py-1 text-xs font-medium text-black"
-              >
-                Adjust
-              </button>
+              <div className="flex gap-1">
+                <button
+                  type="button"
+                  onClick={() => void adjustBalance(account, "add")}
+                  className="rounded-md bg-green-600 px-2 py-1 text-xs font-medium text-white"
+                >
+                  Add Money
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void adjustBalance(account, "withdraw")}
+                  className="rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white"
+                >
+                  Withdraw
+                </button>
+              </div>
             </div>
           </article>
         ))}
