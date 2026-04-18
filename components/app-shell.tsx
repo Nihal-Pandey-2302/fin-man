@@ -8,28 +8,35 @@ import { GlobalSearch } from "@/components/global-search";
 import type { AppToastEventDetail } from "@/lib/toast";
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/accounts", label: "Accounts" },
-  { href: "/expenses", label: "Expenses" },
-  { href: "/earnings", label: "Earnings" },
-  { href: "/investments", label: "Investments" },
-  { href: "/subscriptions", label: "Subscriptions" },
-  { href: "/loans", label: "Loans" },
-  { href: "/analytics", label: "Analytics" },
-  { href: "/settings", label: "Settings" },
+  { href: "/dashboard", label: "Dashboard", mobileLabel: "Home" },
+  { href: "/accounts", label: "Accounts", mobileLabel: "Accounts" },
+  { href: "/expenses", label: "Expenses", mobileLabel: "Expenses" },
+  { href: "/earnings", label: "Earnings", mobileLabel: "Earnings" },
+  { href: "/investments", label: "Investments", mobileLabel: "Invest" },
+  { href: "/subscriptions", label: "Subscriptions", mobileLabel: "Subs" },
+  { href: "/loans", label: "Loans", mobileLabel: "Loans" },
+  { href: "/analytics", label: "Analytics", mobileLabel: "Stats" },
+  { href: "/settings", label: "Settings", mobileLabel: "Settings" },
 ];
-const mobileNavItems = navItems.slice(0, 6);
 
-function NavLink({ href, label }: { href: string; label: string }) {
+function NavLink({
+  href,
+  label,
+  compact = false,
+}: {
+  href: string;
+  label: string;
+  compact?: boolean;
+}) {
   const pathname = usePathname();
   const active = pathname === href;
 
   return (
     <Link
       href={href}
-      className={`rounded-md px-3 py-2 text-sm ${
+      className={`rounded-md px-3 py-2 ${compact ? "text-xs whitespace-nowrap" : "text-sm"} ${
         active
-          ? "bg-blue-600/20 text-blue-300"
+          ? "bg-blue-600/25 text-blue-200"
           : "text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
       }`}
     >
@@ -114,10 +121,10 @@ export function AppShell({
         <main className="w-full p-4 pb-24 md:p-6 md:pb-6">{children}</main>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-zinc-800 bg-zinc-950/95 p-2 backdrop-blur md:hidden">
-        <div className="grid grid-cols-6 gap-1">
-          {mobileNavItems.map((item) => (
-            <NavLink key={item.href} {...item} />
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-zinc-800 bg-zinc-950/95 px-2 pb-[max(env(safe-area-inset-bottom),0.5rem)] pt-2 backdrop-blur md:hidden">
+        <div className="no-scrollbar flex gap-1 overflow-x-auto">
+          {navItems.map((item) => (
+            <NavLink key={item.href} href={item.href} label={item.mobileLabel} compact />
           ))}
         </div>
       </nav>
