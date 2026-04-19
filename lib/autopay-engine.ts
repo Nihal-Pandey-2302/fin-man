@@ -36,21 +36,40 @@ type Subscription = {
   next_due_date?: string | null;
 };
 
-export async function runAutopayEngineForCurrentUser(supabase: SupabaseClient) {
+// ─── Auth is handled by the CALLER, not here ───────────────────────────────
+// Usage (in dashboard layout/page):
+//
+//   const supabase = await createSupabaseServerClient();
+//   const { data: { user } } = await supabase.auth.getUser();
+//   if (user) {
+//     await runAutopayEngineForCurrentUser(supabase, user.id);
+//   }
+//
+// Optional cookie guard to avoid running on every render:
+//
+//   const lastRun = cookies().get("autopay_last_run")?.value;
+//   if (lastRun !== today) {
+//     await runAutopayEngineForCurrentUser(supabase, user.id);
+//     // then set cookie: cookies().set("autopay_last_run", today)
+//   }
+// ───────────────────────────────────────────────────────────────────────────
+
+export async function runAutopayEngineForCurrentUser(
+  supabase: SupabaseClient,
+  userId: string            // ← passed in by caller, no auth fetch here
+) {
   const today = new Date().toISOString().slice(0, 10);
   const { today: sipToday, monthKey, dayOfMonth, lastDayOfMonth } = localDateParts();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
-  if (!user) {
-    return { firedCount: 0, toastMessages: [] as string[] };
-  }
+  let firedCount = 0;
+  const toastMessages: string[] = [];
+
+  // ── Subscriptions autopay ─────────────────────────────────────────────────
 
   const { data: subscriptions, error } = await supabase
     .from("subscriptions")
     .select("id, name, amount, category, account_id, billing_cycle, next_due_date")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .eq("auto_insert", true)
     .eq("is_active", true);
 
@@ -58,15 +77,12 @@ export async function runAutopayEngineForCurrentUser(supabase: SupabaseClient) {
     return { firedCount: 0, toastMessages: [] as string[] };
   }
 
-  let firedCount = 0;
-  const toastMessages: string[] = [];
-
   for (const sub of (subscriptions ?? []) as Subscription[]) {
     const currentDue = (sub.next_due_date ?? "").slice(0, 10);
     if (!currentDue || currentDue > today) continue;
 
     const { error: expenseError } = await supabase.from("expenses").insert({
-      user_id: user.id,
+      user_id: userId,
       amount: sub.amount,
       category: sub.category ?? "subscription",
       currency: "INR",
@@ -105,12 +121,14 @@ export async function runAutopayEngineForCurrentUser(supabase: SupabaseClient) {
     toastMessages.push(`INR ${Number(sub.amount).toFixed(2)} auto-deducted for ${sub.name}`);
   }
 
+  // ── SIP autopay ───────────────────────────────────────────────────────────
+
   const { data: sipInvestments, error: sipError } = await supabase
     .from("investments")
     .select(
       "id, name, is_sip, sip_amount, sip_date, account_id, sip_last_posted_month, amount_invested, current_value, note"
     )
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .eq("is_sip", true);
 
   if (!sipError && sipInvestments?.length) {
@@ -119,13 +137,13 @@ export async function runAutopayEngineForCurrentUser(supabase: SupabaseClient) {
       const sipDay = inv.sip_date;
       if (!amount || sipDay == null || sipDay < 1 || sipDay > 31) continue;
       if (!inv.account_id) continue;
-      if (inv.sip_last_posted_month === monthKey) continue;
+      if (inv.sip_last_posted_month === monthKey) continue;   // duplicate guard ✓
 
       const effectiveSipDay = Math.min(sipDay, lastDayOfMonth);
       if (dayOfMonth < effectiveSipDay) continue;
 
       const { error: expenseError } = await supabase.from("expenses").insert({
-        user_id: user.id,
+        user_id: userId,
         amount,
         category: "investment",
         currency: "INR",
