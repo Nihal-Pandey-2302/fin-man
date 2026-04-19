@@ -32,7 +32,7 @@ export function DashboardCharts({
       <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/90 p-4">
         <h3 className="text-sm font-semibold text-zinc-200">Top spending categories</h3>
         <div className="mt-3 h-72">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="99%" height={288}>
             <PieChart>
               <Pie data={categoryData} dataKey="value" nameKey="name" innerRadius={55} outerRadius={95}>
                 {categoryData.map((entry, index) => (
@@ -65,7 +65,7 @@ export function DashboardCharts({
           </div>
         </div>
         <div className="mt-3 h-72">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="99%" height={288}>
             <BarChart data={trendData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
               <XAxis dataKey="month" stroke="#a1a1aa" />
