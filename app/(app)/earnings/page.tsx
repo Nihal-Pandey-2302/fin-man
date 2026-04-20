@@ -4,7 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase-server";
 export default async function EarningsPage() {
   const supabase = await createSupabaseServerClient();
   const [accountsRes, incomeRes, settingsRes] = await Promise.all([
-    supabase.from("accounts").select("id, name").order("name", { ascending: true }),
+    supabase.from("accounts").select("id, name, balance").order("name", { ascending: true }),
     supabase
       .from("income_entries")
       .select("id, source_name, source_type, amount, date, account_id, note")
@@ -17,7 +17,7 @@ export default async function EarningsPage() {
 
   return (
     <EarningsManager
-      accounts={(accountsRes.data ?? []) as { id: string; name: string }[]}
+      accounts={(accountsRes.data ?? []) as { id: string; name: string; balance: number }[]}
       initialItems={
         (incomeRes.data ?? []) as Array<{
           id: string;

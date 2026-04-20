@@ -39,7 +39,7 @@ export function DashboardCharts({
                   <Cell key={entry.name} fill={colors[index % colors.length]} />
                 ))}
               </Pie>
-              <Tooltip formatter={(value) => `INR ${Number(value ?? 0).toFixed(2)}`} />
+              <Tooltip formatter={(value) => `₹${Number(value ?? 0).toFixed(2)}`} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -70,7 +70,7 @@ export function DashboardCharts({
               <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
               <XAxis dataKey="month" stroke="#a1a1aa" />
               <YAxis stroke="#a1a1aa" />
-              <Tooltip formatter={(value) => `INR ${Number(value ?? 0).toFixed(2)}`} />
+              <Tooltip formatter={(value) => `₹${Number(value ?? 0).toFixed(2)}`} />
               <Bar dataKey="value" fill="#3b82f6" />
             </BarChart>
           </ResponsiveContainer>

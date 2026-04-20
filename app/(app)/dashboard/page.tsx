@@ -34,6 +34,13 @@ function addMonths(dateIso: string, months: number) {
   return d.toISOString().slice(0, 10);
 }
 
+function daysUntil(dateIso: string, now: Date) {
+  const due = new Date(`${dateIso}T00:00:00.000Z`);
+  const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const diff = due.getTime() - todayStart.getTime();
+  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+}
+
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -239,35 +246,46 @@ export default async function DashboardPage({
     month?: number;
     year?: number;
   }>) ?? [];
+  const recentTransactions = recentExpenses.slice(0, 5);
 
   return (
-    <section className="space-y-5">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/90 p-4 shadow-sm">
+    <section className="space-y-8 pb-24">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="rounded-2xl border border-green-700/40 bg-gradient-to-br from-green-900/35 via-zinc-900/85 to-zinc-900/70 p-4 shadow-sm">
           <p className="text-xs text-zinc-400">Net Worth</p>
-          <p className="mt-1 text-2xl font-semibold text-green-400">INR {netWorth.toFixed(2)}</p>
+          <p className="metric-value mt-1 flex items-center gap-2 text-green-400">
+            <span className="rupee-sign">₹</span> {netWorth.toFixed(2)}
+            <span className="text-sm">{netWorth >= 0 ? "↑" : "↓"}</span>
+          </p>
         </div>
         <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/90 p-4 shadow-sm">
           <p className="text-xs text-zinc-400">Liquid Cash</p>
-          <p className="mt-1 text-2xl font-semibold text-blue-300">INR {liquidCash.toFixed(2)}</p>
+          <p className="metric-value mt-1 flex items-center gap-2 text-zinc-100">
+            <span className="rupee-sign">₹</span> {liquidCash.toFixed(2)}
+            <span className={`text-sm ${liquidCash >= 0 ? "text-green-400" : "text-red-400"}`}>{liquidCash >= 0 ? "↑" : "↓"}</span>
+          </p>
           <p className="mt-1 text-xs text-zinc-500">
-            Cash in hand: INR {cashInHand.toFixed(2)} • Accounts: INR {accountMoney.toFixed(2)}
+            Cash in hand: <span className="rupee-sign">₹</span> {cashInHand.toFixed(2)} • Accounts: <span className="rupee-sign">₹</span> {accountMoney.toFixed(2)}
           </p>
         </div>
         <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/90 p-4 shadow-sm">
           <p className="text-xs text-zinc-400">Buffer Status</p>
-          <p className="mt-1 text-2xl font-semibold text-cyan-300">INR {liquidBuffer.toFixed(2)}</p>
+          <p className="metric-value mt-1 flex items-center gap-2 text-zinc-100">
+            <span className="rupee-sign">₹</span> {liquidBuffer.toFixed(2)}
+            <span className={`text-sm ${bufferFreeCash >= 0 ? "text-green-400" : "text-red-400"}`}>{bufferFreeCash >= 0 ? "↑" : "↓"}</span>
+          </p>
           <p className={`mt-1 text-xs ${bufferFreeCash >= 0 ? "text-green-300" : "text-red-300"}`}>
-            Free after buffer: INR {bufferFreeCash.toFixed(2)}
+            Free after buffer: <span className="rupee-sign">₹</span> {bufferFreeCash.toFixed(2)}
           </p>
         </div>
         <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/90 p-4 shadow-sm">
           <p className="text-xs text-zinc-400">This Month</p>
-          <p className="mt-1 text-sm text-red-300">Spent: INR {thisMonthSpend.toFixed(2)}</p>
-          <p className="text-sm text-green-300">Invested: INR {thisMonthInvested.toFixed(2)}</p>
-          <p className="text-sm text-blue-300">Income: INR {thisMonthIncome.toFixed(2)}</p>
+          <p className="text-sm text-red-300">Spent: <span className="rupee-sign">₹</span> {thisMonthSpend.toFixed(2)}</p>
+          <p className="text-sm text-green-300">Invested: <span className="rupee-sign">₹</span> {thisMonthInvested.toFixed(2)}</p>
+          <p className="text-sm text-zinc-100">Income: <span className="rupee-sign">₹</span> {thisMonthIncome.toFixed(2)}</p>
           <p className={`text-sm ${thisMonthSaved >= 0 ? "text-emerald-300" : "text-red-300"}`}>
-            Saved: INR {thisMonthSaved.toFixed(2)}
+            Saved: <span className="rupee-sign">₹</span> {thisMonthSaved.toFixed(2)}
+            <span className="ml-1">{thisMonthSaved >= 0 ? "↑" : "↓"}</span>
           </p>
           <p className="text-sm text-blue-300">Savings Rate: {savingsRate.toFixed(2)}%</p>
         </div>
@@ -276,16 +294,20 @@ export default async function DashboardPage({
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/90 p-4">
           <h2 className="text-sm font-semibold text-zinc-200">Upcoming autopays (7 days)</h2>
-          <div className="mt-3 space-y-2 text-sm">
-            {upcomingAutopays.length === 0 ? <p className="text-zinc-400">No upcoming autopays.</p> : null}
+          <div className="mt-4 flex flex-wrap gap-2 text-sm">
+            {upcomingAutopays.length === 0 ? <p className="empty-state text-sm">◌ No upcoming autopays.</p> : null}
             {upcomingAutopays.map((item) => {
               const due = item.next_due_date ?? "";
-              const tone =
-                due < monthStart ? "text-red-400" : due === now.toISOString().slice(0, 10) ? "text-yellow-300" : "text-zinc-200";
+              const remainingDays = due ? daysUntil(due, now) : 0;
+              const badgeTone =
+                remainingDays < 0 ? "bg-red-500/20 text-red-300 border-red-500/40" : remainingDays <= 1 ? "bg-yellow-500/20 text-yellow-200 border-yellow-500/40" : "bg-blue-500/15 text-blue-200 border-blue-500/30";
               return (
-                <div key={item.id} className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2">
-                  <span>{item.name}</span>
-                  <span className={tone}>INR {Number(item.amount).toFixed(2)} • {due}</span>
+                <div key={item.id} className="flex items-center gap-2 rounded-full border border-zinc-700/70 bg-zinc-950/70 px-3 py-1.5">
+                  <span className="text-zinc-100">{item.name}</span>
+                  <span className="text-zinc-300"><span className="rupee-sign">₹</span> {Number(item.amount).toFixed(2)}</span>
+                  <span className={`rounded-full border px-2 py-0.5 text-xs ${badgeTone}`}>
+                    {remainingDays < 0 ? `${Math.abs(remainingDays)}d overdue` : `${remainingDays}d left`}
+                  </span>
                 </div>
               );
             })}
@@ -293,16 +315,25 @@ export default async function DashboardPage({
         </div>
 
         <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/90 p-4">
-          <h2 className="text-sm font-semibold text-zinc-200">Open loans summary</h2>
-          <div className="mt-3 grid gap-2 md:grid-cols-2">
-            <div className="rounded-lg border border-zinc-800 bg-zinc-950/70 p-3">
-              <p className="text-xs text-zinc-400">You owe</p>
-              <p className="text-lg font-semibold text-red-300">INR {loansOwed.toFixed(2)}</p>
-            </div>
-            <div className="rounded-lg border border-zinc-800 bg-zinc-950/70 p-3">
-              <p className="text-xs text-zinc-400">Owed to you</p>
-              <p className="text-lg font-semibold text-green-300">INR {loansToYou.toFixed(2)}</p>
-            </div>
+          <h3 className="text-sm font-semibold text-zinc-200">Recent transactions</h3>
+          <div className="mt-4 space-y-2">
+            {recentTransactions.length === 0 ? <p className="empty-state text-sm">◌ No recent transactions.</p> : null}
+            {recentTransactions.map((expense) => (
+              <div key={expense.id} className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm">
+                <span>{expense.category} • {expense.note ?? "No note"}</span>
+                <span
+                  className={
+                    expense.account_id && expense.account?.type === "cash"
+                      ? "text-amber-300"
+                      : expense.account_id
+                        ? "text-blue-300"
+                        : "text-red-300"
+                  }
+                >
+                  <span className="rupee-sign">₹</span> {Number(expense.amount).toFixed(2)} ({expense.date})
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -316,31 +347,9 @@ export default async function DashboardPage({
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/90 p-4">
-          <h3 className="text-sm font-semibold text-zinc-200">Recent transactions</h3>
-          <div className="mt-3 space-y-2">
-            {recentExpenses.map((expense) => (
-              <div key={expense.id} className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm">
-                <span>{expense.category} • {expense.note ?? "No note"}</span>
-                <span
-                  className={
-                    expense.account_id && expense.account?.type === "cash"
-                      ? "text-amber-300"
-                      : expense.account_id
-                        ? "text-blue-300"
-                        : "text-red-300"
-                  }
-                >
-                  INR {Number(expense.amount).toFixed(2)} ({expense.date})
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/90 p-4">
           <h3 className="text-sm font-semibold text-zinc-200">Budget vs actual</h3>
-          <div className="mt-3 space-y-3">
-            {budgets.length === 0 ? <p className="text-sm text-zinc-400">No budget limits configured.</p> : null}
+          <div className="mt-4 space-y-4">
+            {budgets.length === 0 ? <p className="empty-state text-sm">◌ No budget limits configured.</p> : null}
             {budgetRows.map((budget) => {
               const period = budget.period ?? "monthly";
               let start = budget.period_start;
@@ -354,21 +363,37 @@ export default async function DashboardPage({
                 .reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
               const limit = Number(budget.monthly_limit || 0);
               const percent = limit > 0 ? Math.min(100, (actual / limit) * 100) : 0;
-              const over = actual > limit;
+              const nearOrOver = percent >= 80;
               return (
                 <div key={budget.id}>
                   <div className="mb-1 flex items-center justify-between text-xs">
                     <span className="text-zinc-300">{budget.category} ({period})</span>
-                    <span className={over ? "text-red-300" : "text-zinc-400"}>
-                      INR {actual.toFixed(2)} / {limit.toFixed(2)}
+                    <span className={nearOrOver ? "text-red-300" : "text-zinc-400"}>
+                      <span className="rupee-sign">₹</span> {actual.toFixed(2)} / <span className="rupee-sign">₹</span> {limit.toFixed(2)}
                     </span>
                   </div>
-                  <div className="h-2 overflow-hidden rounded bg-zinc-800">
-                    <div className={`h-full ${over ? "bg-red-500" : "bg-blue-500"}`} style={{ width: `${percent}%` }} />
+                  <div className="h-2.5 overflow-hidden rounded-full bg-zinc-800/80">
+                    <div
+                      className={`h-full rounded-full ${nearOrOver ? "bg-red-500" : "bg-blue-500"}`}
+                      style={{ width: `${percent}%` }}
+                    />
                   </div>
                 </div>
               );
             })}
+          </div>
+        </div>
+        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/90 p-4">
+          <h2 className="text-sm font-semibold text-zinc-200">Open loans summary</h2>
+          <div className="mt-4 grid gap-2 md:grid-cols-2">
+            <div className="rounded-lg border border-zinc-800 bg-zinc-950/70 p-3">
+              <p className="text-xs text-zinc-400">You owe</p>
+              <p className="metric-value text-red-300"><span className="rupee-sign">₹</span> {loansOwed.toFixed(2)}</p>
+            </div>
+            <div className="rounded-lg border border-zinc-800 bg-zinc-950/70 p-3">
+              <p className="text-xs text-zinc-400">Owed to you</p>
+              <p className="metric-value text-green-300"><span className="rupee-sign">₹</span> {loansToYou.toFixed(2)}</p>
+            </div>
           </div>
         </div>
       </div>

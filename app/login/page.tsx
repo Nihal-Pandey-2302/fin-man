@@ -114,7 +114,7 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-950 px-4 text-zinc-100">
       <div className="w-full max-w-md rounded-xl border border-zinc-800 bg-zinc-900 p-6">
-        <h1 className="text-xl font-semibold">Sign in to Finance Terminal</h1>
+        <h1 className="border-l-4 border-blue-500 pl-3 text-xl font-semibold">Sign in to Finance Terminal</h1>
         <p className="mt-2 text-sm text-zinc-400">
           Email + password auth powered by Supabase.
         </p>

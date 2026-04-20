@@ -40,7 +40,17 @@ export function AccountsManager({
   const [form, setForm] = useState(initialForm);
   const [adjustValues, setAdjustValues] = useState<Record<string, string>>({});
   const [adjustNotes, setAdjustNotes] = useState<Record<string, string>>({});
+  const [showAddForm, setShowAddForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const totalAcrossAccounts = accounts.reduce((sum, account) => sum + Number(account.balance || 0), 0);
+
+  const accountTypeAccent = (type: string) => {
+    if (type === "bank") return "border-l-green-400";
+    if (type === "cash") return "border-l-yellow-400";
+    if (type === "ppf" || type === "savings") return "border-l-blue-400";
+    return "border-l-zinc-600";
+  };
 
   const loadAccounts = async () => {
     if (!userId) {
@@ -169,62 +179,78 @@ export function AccountsManager({
   };
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-4 pb-24">
       <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-        <h1 className="text-lg font-semibold">Accounts</h1>
+        <p className="text-xs uppercase tracking-wide text-zinc-400">Total across all accounts</p>
+        <p className={`metric-value mt-1 text-right text-3xl ${totalAcrossAccounts >= 0 ? "text-green-400" : "text-red-400"}`}>
+          <span className="rupee-sign">₹</span> {totalAcrossAccounts.toFixed(2)}
+        </p>
+      </div>
+
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+        <h1 className="border-l-4 border-blue-500 pl-3 text-lg font-semibold">Accounts</h1>
         <p className="mt-1 text-sm text-zinc-400">
           Add, edit, delete, and manually adjust balances with an audit note.
         </p>
+        <button
+          type="button"
+          onClick={() => setShowAddForm((prev) => !prev)}
+          className="mt-4 rounded-md border border-zinc-700 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800/80"
+        >
+          {showAddForm ? "▾ Hide new account form" : "▸ Add new account"}
+        </button>
 
-        <form onSubmit={handleSubmit} className="mt-4 grid gap-2 md:grid-cols-6">
-          <input
-            required
-            placeholder="Account name"
-            value={form.name}
-            onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-            className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm md:col-span-2"
-          />
-          <select
-            value={form.type}
-            onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))}
-            className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
-          >
-            {accountTypes.map((type) => (
-              <option key={type} value={type}>
-                {type}
-              </option>
-            ))}
-          </select>
-          <input
-            type="number"
-            step="0.01"
-            value={form.balance}
-            onChange={(e) => setForm((prev) => ({ ...prev, balance: e.target.value }))}
-            className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
-          />
-          <input
-            value={form.currency}
-            onChange={(e) => setForm((prev) => ({ ...prev, currency: e.target.value }))}
-            className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
-          />
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-500"
+        {showAddForm || editingId ? (
+          <form onSubmit={handleSubmit} className="mt-4 grid gap-2 md:grid-cols-6">
+            <input
+              required
+              placeholder="Account name"
+              value={form.name}
+              onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+              className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm md:col-span-2"
+            />
+            <select
+              value={form.type}
+              onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))}
+              className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
             >
-              {editingId ? "Update" : "Add"}
-            </button>
-            {editingId ? (
+              {accountTypes.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </select>
+            <input
+              type="number"
+              step="0.01"
+              value={form.balance}
+              onChange={(e) => setForm((prev) => ({ ...prev, balance: e.target.value }))}
+              className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
+            />
+            <input
+              value={form.currency}
+              onChange={(e) => setForm((prev) => ({ ...prev, currency: e.target.value }))}
+              className="rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
+            />
+            <div className="flex gap-2">
               <button
-                type="button"
-                onClick={resetForm}
-                className="rounded-md border border-zinc-700 px-3 py-2 text-sm text-zinc-300"
+                type="submit"
+                className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-500"
               >
-                Cancel
+                {editingId ? "Update" : "Add"}
               </button>
-            ) : null}
-          </div>
-        </form>
+              {editingId ? (
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="rounded-md border border-zinc-700 px-3 py-2 text-sm text-zinc-300"
+                >
+                  Cancel
+                </button>
+              ) : null}
+            </div>
+          </form>
+        ) : null}
       </div>
 
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
@@ -233,17 +259,17 @@ export function AccountsManager({
         {accounts.map((account) => (
           <article
             key={account.id}
-            className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-sm"
+            className={`rounded-xl border border-zinc-800 border-l-4 bg-zinc-900 p-4 text-sm ${accountTypeAccent(account.type)}`}
           >
-            <div className="flex items-center justify-between">
+            <div className="flex items-start justify-between">
               <div>
                 <p className="font-medium">
                   {account.icon} {account.name}
                 </p>
                 <p className="text-xs text-zinc-400">{account.type}</p>
               </div>
-              <p className={account.balance >= 0 ? "text-green-400" : "text-red-400"}>
-                {account.currency} {Number(account.balance).toFixed(2)}
+              <p className={`font-mono text-3xl text-right ${account.balance >= 0 ? "text-green-400" : "text-red-400"}`}>
+                <span className="rupee-sign">₹</span> {Number(account.balance).toFixed(2)}
               </p>
             </div>
 
@@ -287,16 +313,16 @@ export function AccountsManager({
                 <button
                   type="button"
                   onClick={() => void adjustBalance(account, "add")}
-                  className="rounded-md bg-green-600 px-2 py-1 text-xs font-medium text-white"
+                  className="inline-flex items-center gap-1 rounded-md border border-zinc-700 bg-transparent px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-800/70"
                 >
-                  Add Money
+                  <span className="text-green-400">+</span> Add
                 </button>
                 <button
                   type="button"
                   onClick={() => void adjustBalance(account, "withdraw")}
-                  className="rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white"
+                  className="inline-flex items-center gap-1 rounded-md border border-zinc-700 bg-transparent px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-800/70"
                 >
-                  Withdraw
+                  <span className="text-red-400">−</span> Withdraw
                 </button>
               </div>
             </div>

@@ -64,7 +64,7 @@ export function GlobalSearch() {
           type: "Expenses",
           rows: (expenses.data ?? []).map((row) => ({
             id: row.id,
-            title: `${row.category} • INR ${Number(row.amount).toFixed(2)}`,
+            title: `${row.category} • ₹${Number(row.amount).toFixed(2)}`,
             subtitle: `${row.subcategory ?? "General"} • ${row.note ?? "No note"} • ${row.date}`,
             href: "/expenses",
           })),
@@ -73,7 +73,7 @@ export function GlobalSearch() {
           type: "Subscriptions",
           rows: (subscriptions.data ?? []).map((row) => ({
             id: row.id,
-            title: `${row.name} • INR ${Number(row.amount).toFixed(2)}`,
+            title: `${row.name} • ₹${Number(row.amount).toFixed(2)}`,
             subtitle: `${row.category ?? "subscription"} • due ${row.next_due_date ?? "n/a"}`,
             href: "/subscriptions",
           })),
@@ -83,7 +83,7 @@ export function GlobalSearch() {
           rows: (investments.data ?? []).map((row) => ({
             id: row.id,
             title: `${row.name} • ${row.type}`,
-            subtitle: `${row.platform ?? "No platform"} • current INR ${Number(row.current_value ?? 0).toFixed(2)}`,
+            subtitle: `${row.platform ?? "No platform"} • current ₹${Number(row.current_value ?? 0).toFixed(2)}`,
             href: "/investments",
           })),
         },
@@ -91,7 +91,7 @@ export function GlobalSearch() {
           type: "Loans",
           rows: (loans.data ?? []).map((row) => ({
             id: row.id,
-            title: `${row.person_name} • INR ${Number(row.amount).toFixed(2)}`,
+            title: `${row.person_name} • ₹${Number(row.amount).toFixed(2)}`,
             subtitle: `${row.reason ?? "No reason"} • ${row.status}`,
             href: "/loans",
           })),
@@ -123,7 +123,7 @@ export function GlobalSearch() {
             />
             <div className="mt-3 max-h-[60vh] space-y-3 overflow-auto">
               {groups.length === 0 ? (
-                <p className="text-sm text-zinc-400">No results yet. Start typing a keyword.</p>
+                <p className="empty-state text-sm">◌ No results yet. Start typing a keyword.</p>
               ) : (
                 groups.map((group) => (
                   <div key={group.type}>

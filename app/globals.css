@@ -18,6 +18,50 @@ body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
+/* Global glass treatment for the app's card surfaces */
+[class*="border-zinc-800"][class*="bg-zinc-900"] {
+  background-color: rgb(24 24 27 / 0.6);
+  border-color: rgb(39 39 42 / 0.5);
+  backdrop-filter: blur(4px);
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.3), 0 8px 10px -6px rgb(0 0 0 / 0.3);
+}
+
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  background-color: rgb(39 39 42 / 0.8);
+  border-color: rgb(63 63 70);
+  border-radius: 0.5rem;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: rgb(59 130 246);
+  box-shadow: 0 0 0 1px rgb(59 130 246 / 0.3);
+}
+
+button[class*="bg-blue-600"] {
+  box-shadow: 0 0 12px rgb(59 130 246 / 0.3);
+}
+
+.metric-value {
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1.5rem;
+  line-height: 2rem;
+  font-weight: 600;
+}
+
+.rupee-sign {
+  color: rgb(59 130 246);
+  font-weight: 700;
+}
+
+.empty-state {
+  color: rgb(82 82 91);
+}
+
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;

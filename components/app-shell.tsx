@@ -8,24 +8,26 @@ import { GlobalSearch } from "@/components/global-search";
 import type { AppToastEventDetail } from "@/lib/toast";
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", mobileLabel: "Home" },
-  { href: "/accounts", label: "Accounts", mobileLabel: "Accounts" },
-  { href: "/expenses", label: "Expenses", mobileLabel: "Expenses" },
-  { href: "/earnings", label: "Earnings", mobileLabel: "Earnings" },
-  { href: "/investments", label: "Investments", mobileLabel: "Invest" },
-  { href: "/subscriptions", label: "Subscriptions", mobileLabel: "Subs" },
-  { href: "/loans", label: "Loans", mobileLabel: "Loans" },
-  { href: "/analytics", label: "Analytics", mobileLabel: "Stats" },
-  { href: "/settings", label: "Settings", mobileLabel: "Settings" },
+  { href: "/dashboard", label: "Dashboard", mobileLabel: "Home", icon: "⌂" },
+  { href: "/accounts", label: "Accounts", mobileLabel: "Accounts", icon: "◫" },
+  { href: "/expenses", label: "Expenses", mobileLabel: "Expenses", icon: "↗" },
+  { href: "/earnings", label: "Earnings", mobileLabel: "Earnings", icon: "↙" },
+  { href: "/investments", label: "Investments", mobileLabel: "Invest", icon: "◍" },
+  { href: "/subscriptions", label: "Subscriptions", mobileLabel: "Subs", icon: "◌" },
+  { href: "/loans", label: "Loans", mobileLabel: "Loans", icon: "◎" },
+  { href: "/analytics", label: "Analytics", mobileLabel: "Stats", icon: "◔" },
+  { href: "/settings", label: "Settings", mobileLabel: "Settings", icon: "⚙" },
 ];
 
 function NavLink({
   href,
   label,
+  icon,
   compact = false,
 }: {
   href: string;
   label: string;
+  icon?: string;
   compact?: boolean;
 }) {
   const pathname = usePathname();
@@ -38,9 +40,17 @@ function NavLink({
         active
           ? "bg-blue-600/25 text-blue-200"
           : "text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
-      }`}
+      } ${compact ? "flex min-w-[4.5rem] flex-col items-center gap-0.5 pb-1.5" : ""}`}
     >
-      {label}
+      {compact ? (
+        <>
+          <span className="text-sm leading-none">{icon}</span>
+          <span>{label}</span>
+          <span className={`mt-0.5 h-0.5 w-7 rounded-full ${active ? "bg-blue-500" : "bg-transparent"}`} />
+        </>
+      ) : (
+        label
+      )}
     </Link>
   );
 }
@@ -105,8 +115,11 @@ export function AppShell({
         ))}
       </div>
       <div className="mx-auto flex max-w-7xl">
-        <aside className="hidden min-h-screen w-64 border-r border-zinc-800 p-4 md:flex md:flex-col md:gap-3">
-          <h1 className="mb-2 text-lg font-semibold">Finance Terminal</h1>
+        <aside className="hidden min-h-screen w-64 border-r border-zinc-800/60 bg-gradient-to-b from-zinc-900 to-zinc-950 p-4 md:flex md:flex-col md:gap-3">
+          <h1 className="mb-2 flex items-center gap-2 text-xl font-semibold">
+            <span className="h-2.5 w-2.5 rounded-full bg-green-400 shadow-[0_0_10px_rgba(34,197,94,0.7)]" />
+            Finance Terminal
+          </h1>
           <GlobalSearch />
           <nav className="flex flex-col gap-1">
             {navItems.map((item) => (

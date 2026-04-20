@@ -4,7 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase-browser";
 import { pushToast } from "@/lib/toast";
 
-type Account = { id: string; name: string };
+type Account = { id: string; name: string; balance?: number };
 type IncomeEntry = {
   id: string;
   source_name: string;
@@ -48,6 +48,13 @@ export function EarningsManager({
     account_id: "",
     note: "",
   });
+  const monthKey = new Date().toISOString().slice(0, 7);
+  const totalMonthEarnings = items
+    .filter((entry) => entry.date.slice(0, 7) === monthKey)
+    .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
+  const liquidCash = accounts.reduce((sum, account) => sum + Number(account.balance || 0), 0);
+  const bufferValue = Number(buffer || 0);
+  const bufferProgress = bufferValue > 0 ? Math.min(100, (liquidCash / bufferValue) * 100) : 0;
 
   const reload = async () => {
     const { data, error: fetchError } = await supabase
@@ -153,17 +160,39 @@ export function EarningsManager({
   };
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-5 pb-24">
       <header className="rounded-2xl border border-zinc-800 bg-gradient-to-r from-zinc-900 to-zinc-900/70 p-5">
-        <h1 className="text-lg font-semibold">Earnings</h1>
+        <h1 className="border-l-4 border-blue-500 pl-3 text-lg font-semibold">Earnings</h1>
         <p className="mt-1 text-sm text-zinc-400">Track salary/freelance income and maintain your liquid cash buffer.</p>
       </header>
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
+        <p className="text-xs text-zinc-400">Total earnings this month</p>
+        <p className="metric-value mt-1 text-green-300">
+          <span className="rupee-sign">₹</span> {totalMonthEarnings.toFixed(2)}
+        </p>
+      </div>
       {error ? <p className="rounded-xl border border-red-900/70 bg-red-950/30 px-3 py-2 text-sm text-red-300">{error}</p> : null}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <form onSubmit={saveBuffer} className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4 lg:col-span-1">
           <h2 className="text-sm font-semibold text-zinc-200">Liquid buffer</h2>
           <p className="mt-1 text-xs text-zinc-500">Minimum liquid cash you want untouched.</p>
+          <div className="mt-3 rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
+            <div className="mb-1 flex items-center justify-between text-xs">
+              <span className="text-zinc-400">Liquid cash</span>
+              <span className="text-zinc-300"><span className="rupee-sign">₹</span> {liquidCash.toFixed(2)}</span>
+            </div>
+            <div className="mb-2 flex items-center justify-between text-xs">
+              <span className="text-zinc-400">Buffer target</span>
+              <span className="text-zinc-300"><span className="rupee-sign">₹</span> {bufferValue.toFixed(2)}</span>
+            </div>
+            <div className="h-2.5 overflow-hidden rounded-full bg-zinc-800/80">
+              <div
+                className={`h-full rounded-full ${liquidCash >= bufferValue ? "bg-green-500" : "bg-yellow-500"}`}
+                style={{ width: `${bufferProgress}%` }}
+              />
+            </div>
+          </div>
           <input
             type="number"
             min={0}
@@ -252,14 +281,19 @@ export function EarningsManager({
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
         <h2 className="text-sm font-semibold text-zinc-200">Recent earnings</h2>
         <div className="mt-3 space-y-2">
-          {items.length === 0 ? <p className="text-sm text-zinc-400">No earnings yet.</p> : null}
+          {items.length === 0 ? (
+            <div className="flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-950/50 px-3 py-3 text-sm text-zinc-500">
+              <span className="rupee-sign text-base">₹</span>
+              <span>No earnings recorded yet</span>
+            </div>
+          ) : null}
           {items.map((entry) => (
             <div key={entry.id} className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm">
               <span>
                 {entry.source_name} • {entry.source_type}
               </span>
-              <span className="text-emerald-300">
-                INR {Number(entry.amount).toFixed(2)} ({entry.date})
+              <span className="metric-value text-emerald-300">
+                <span className="rupee-sign">₹</span> {Number(entry.amount).toFixed(2)} ({entry.date})
               </span>
             </div>
           ))}

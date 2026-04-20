@@ -28,6 +28,29 @@ const defaultForm = {
   auto_insert: true,
 };
 
+const suggestedSubs = ["Netflix", "Spotify", "YouTube Premium", "Prime Video", "ChatGPT Plus"];
+
+function daysUntil(dateIso: string | null) {
+  if (!dateIso) return null;
+  const now = new Date();
+  const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const due = new Date(`${dateIso}T00:00:00.000Z`);
+  return Math.ceil((due.getTime() - todayStart.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function monthlyEquivalent(amount: number, cycle: string) {
+  if (cycle === "weekly") return amount * 4.33;
+  if (cycle === "quarterly") return amount / 3;
+  if (cycle === "yearly") return amount / 12;
+  return amount;
+}
+
+function logoTone(name: string) {
+  const tones = ["bg-blue-500/20 text-blue-300", "bg-purple-500/20 text-purple-300", "bg-green-500/20 text-green-300", "bg-yellow-500/20 text-yellow-300", "bg-pink-500/20 text-pink-300"];
+  const index = name.length % tones.length;
+  return tones[index];
+}
+
 export function SubscriptionsManager({
   accounts,
   initialItems,
@@ -41,6 +64,10 @@ export function SubscriptionsManager({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const recurringMonthlyTotal = items.reduce(
+    (sum, item) => sum + monthlyEquivalent(Number(item.amount || 0), item.billing_cycle),
+    0
+  );
 
   const load = async () => {
     const { data, error: fetchError } = await supabase
@@ -96,8 +123,8 @@ export function SubscriptionsManager({
         next_billing_date: advanceDateByCycle(today, item.billing_cycle),
       })
       .eq("id", item.id);
-    setToast(`INR ${Number(item.amount).toFixed(2)} auto-deducted for ${item.name}`);
-    pushToast({ message: `INR ${Number(item.amount).toFixed(2)} auto-deducted for ${item.name}`, tone: "warning" });
+    setToast(`₹${Number(item.amount).toFixed(2)} auto-deducted for ${item.name}`);
+    pushToast({ message: `₹${Number(item.amount).toFixed(2)} auto-deducted for ${item.name}`, tone: "warning" });
     await load();
   };
 
@@ -148,13 +175,19 @@ export function SubscriptionsManager({
   };
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-4 pb-24">
       <header className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-        <h1 className="text-lg font-semibold">Subscriptions</h1>
+        <h1 className="border-l-4 border-blue-500 pl-3 text-lg font-semibold">Subscriptions</h1>
         <p className="mt-1 text-sm text-zinc-400">
           Recurring payments with auto-insert engine and manual trigger.
         </p>
       </header>
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+        <p className="text-xs text-zinc-400">Monthly recurring total</p>
+        <p className="metric-value mt-1 text-zinc-100">
+          <span className="rupee-sign">₹</span> {recurringMonthlyTotal.toFixed(2)}
+        </p>
+      </div>
 
       {toast ? (
         <div className="rounded-md border border-yellow-700 bg-zinc-900 p-3 text-sm text-yellow-200">
@@ -233,22 +266,69 @@ export function SubscriptionsManager({
       </form>
 
       <div className="space-y-2">
+        {items.length === 0 ? (
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
+            <p className="empty-state text-sm">◌ No subscriptions yet. Try adding one:</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {suggestedSubs.map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() =>
+                    setForm((prev) => ({
+                      ...prev,
+                      name,
+                      amount: prev.amount === "0" ? "" : prev.amount,
+                    }))
+                  }
+                  className="rounded-full border border-zinc-700 bg-transparent px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800/70"
+                >
+                  + {name}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
         {items.map((item) => (
           <article key={item.id} className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="font-medium">{item.name}</p>
-                <p className="text-xs text-zinc-400">
-                  INR {Number(item.amount).toFixed(2)} - {item.billing_cycle} - Due {item.next_due_date}
-                </p>
+            <div className="flex items-start justify-between gap-3">
+              <div className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-sm font-semibold ${logoTone(item.name)}`}>
+                {item.name.slice(0, 1).toUpperCase()}
               </div>
-              <div className="flex gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium">{item.name}</p>
+                <p className="text-xs text-zinc-400">{item.billing_cycle}</p>
+              </div>
+              <div className="text-right">
+                <p className="font-mono text-sm text-zinc-100">
+                  <span className="rupee-sign">₹</span> {Number(item.amount).toFixed(2)}
+                </p>
+                {(() => {
+                  const remaining = daysUntil(item.next_due_date);
+                  const badgeTone =
+                    remaining === null
+                      ? "bg-zinc-700/60 text-zinc-300"
+                      : remaining < 3
+                        ? "bg-red-500/20 text-red-300"
+                        : remaining <= 7
+                          ? "bg-yellow-500/20 text-yellow-200"
+                          : "bg-green-500/20 text-green-300";
+                  return (
+                    <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs ${badgeTone}`}>
+                      {remaining === null ? "No due date" : remaining < 0 ? `${Math.abs(remaining)}d overdue` : `in ${remaining} days`}
+                    </span>
+                  );
+                })()}
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => void triggerAutopayNow(item)}
                   className="rounded-md border border-yellow-700 px-2 py-1 text-xs text-yellow-200"
+                  aria-label="Trigger subscription now"
                 >
-                  Trigger now
+                  ▶ Trigger
                 </button>
                 <button
                   type="button"
@@ -265,18 +345,19 @@ export function SubscriptionsManager({
                     });
                   }}
                   className="rounded-md border border-zinc-700 px-2 py-1 text-xs"
+                  aria-label="Edit subscription"
                 >
-                  Edit
+                  ✎ Edit
                 </button>
                 <button
                   type="button"
                   onClick={() => void onDelete(item.id)}
                   className="rounded-md border border-red-800 px-2 py-1 text-xs text-red-300"
+                  aria-label="Delete subscription"
                 >
-                  Delete
+                  🗑 Delete
                 </button>
               </div>
-            </div>
           </article>
         ))}
       </div>

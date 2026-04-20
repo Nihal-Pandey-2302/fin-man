@@ -29,6 +29,30 @@ const defaultForm = {
   account_id: "",
 };
 
+function formatDateGroupLabel(dateIso: string) {
+  const today = new Date();
+  const todayIso = today.toISOString().slice(0, 10);
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const yesterdayIso = yesterday.toISOString().slice(0, 10);
+  if (dateIso === todayIso) return "Today";
+  if (dateIso === yesterdayIso) return "Yesterday";
+  return new Date(`${dateIso}T00:00:00`).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function categoryDotClass(colorClass: string) {
+  if (colorClass.includes("red")) return "bg-red-400";
+  if (colorClass.includes("green")) return "bg-green-400";
+  if (colorClass.includes("yellow")) return "bg-yellow-400";
+  if (colorClass.includes("blue")) return "bg-blue-400";
+  if (colorClass.includes("purple")) return "bg-purple-400";
+  if (colorClass.includes("orange")) return "bg-orange-400";
+  return "bg-zinc-400";
+}
+
 export function ExpensesManager({
   accounts,
   initialExpenses,
@@ -58,6 +82,7 @@ export function ExpensesManager({
   const [toDate, setToDate] = useState(initialToDate);
   const [categoryFilter, setCategoryFilter] = useState("");
   const [accountFilter, setAccountFilter] = useState("");
+  const [actionMenuId, setActionMenuId] = useState<string | null>(null);
 
   const loadExpenses = async (nextPage = page) => {
     setLoading(true);
@@ -207,13 +232,19 @@ export function ExpensesManager({
   };
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const groupedExpenses = expenses.reduce<Record<string, Expense[]>>((acc, expense) => {
+    if (!acc[expense.date]) acc[expense.date] = [];
+    acc[expense.date].push(expense);
+    return acc;
+  }, {});
+  const groupedDates = Object.keys(groupedExpenses).sort((a, b) => b.localeCompare(a));
 
   return (
     <section className="space-y-4 pb-24">
       <header className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h1 className="text-lg font-semibold">Expenses</h1>
+            <h1 className="border-l-4 border-blue-500 pl-3 text-lg font-semibold">Expenses</h1>
             <p className="mt-1 text-sm text-zinc-400">Track every rupee with account-linked balance updates.</p>
           </div>
           <button
@@ -229,7 +260,53 @@ export function ExpensesManager({
         </div>
       </header>
 
-      <div className="grid gap-2 rounded-xl border border-zinc-800 bg-zinc-900 p-3 md:grid-cols-6">
+      <div className="no-scrollbar flex gap-2 overflow-x-auto rounded-xl border border-zinc-800 bg-zinc-900 p-3 md:hidden">
+        <input
+          type="month"
+          value={monthFilter}
+          onChange={(e) => setMonthFilter(e.target.value)}
+          className="min-w-[9rem] rounded-full border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
+          aria-label="Month filter"
+        />
+        <select
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          className="min-w-[10.5rem] rounded-full border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
+          aria-label="Category filter"
+        >
+          <option value="">All categories</option>
+          {EXPENSE_CATEGORIES.map((category) => (
+            <option key={category.key} value={category.key}>
+              {category.emoji} {category.label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={accountFilter}
+          onChange={(e) => setAccountFilter(e.target.value)}
+          className="min-w-[10.5rem] rounded-full border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
+          aria-label="Account filter"
+        >
+          <option value="">All accounts</option>
+          {accounts.map((account) => (
+            <option key={account.id} value={account.id}>
+              {account.name}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={() => {
+            setPage(1);
+            void loadExpenses(1);
+          }}
+          className="rounded-full bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500"
+        >
+          Apply
+        </button>
+      </div>
+
+      <div className="hidden gap-2 rounded-xl border border-zinc-800 bg-zinc-900 p-3 md:grid md:grid-cols-6">
         <input
           type="month"
           value={monthFilter}
@@ -289,38 +366,54 @@ export function ExpensesManager({
       <div className="space-y-2">
         {loading ? <p className="text-sm text-zinc-400">Loading expenses...</p> : null}
         {!loading && expenses.length === 0 ? (
-          <p className="rounded-md border border-zinc-800 bg-zinc-900 p-3 text-sm text-zinc-400">
-            No expenses found for current filters.
+          <p className="empty-state rounded-md border border-zinc-800 bg-zinc-900 p-3 text-sm">
+            ◌ No expenses found for current filters.
           </p>
         ) : null}
-        {expenses.map((expense) => {
-          const meta = categoryMeta(expense.category);
-          return (
-            <article key={expense.id} className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className={`text-sm font-medium ${meta.colorClass}`}>
-                    {meta.emoji} {meta.label}
-                  </p>
-                  <p className="text-xs text-zinc-400">
-                    {expense.subcategory ?? "General"} - {expense.account?.name ?? "No account"}
-                  </p>
-                </div>
-                <p className="text-sm font-semibold text-red-300">INR {Number(expense.amount).toFixed(2)}</p>
-              </div>
-              <p className="mt-2 text-xs text-zinc-500">{expense.date}</p>
-              {expense.note ? <p className="mt-1 text-sm text-zinc-300">{expense.note}</p> : null}
-              <div className="mt-3 flex gap-2">
-                <button type="button" onClick={() => openEditModal(expense)} className="rounded-md border border-zinc-700 px-2 py-1 text-xs">
-                  Edit
-                </button>
-                <button type="button" onClick={() => void onDelete(expense)} className="rounded-md border border-red-800 px-2 py-1 text-xs text-red-300">
-                  Delete
-                </button>
-              </div>
-            </article>
-          );
-        })}
+        {groupedDates.map((dateKey) => (
+          <div key={dateKey} className="space-y-2">
+            <p className="px-1 text-xs font-medium uppercase tracking-wide text-zinc-500">{formatDateGroupLabel(dateKey)}</p>
+            {groupedExpenses[dateKey].map((expense) => {
+              const meta = categoryMeta(expense.category);
+              return (
+                <article key={expense.id} className="rounded-xl border border-zinc-800 bg-zinc-900 p-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="text-base">{meta.emoji}</span>
+                      <span className={`h-2 w-2 rounded-full ${categoryDotClass(meta.colorClass)}`} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-zinc-100">{expense.subcategory ?? "General"}</p>
+                      <p className="truncate text-xs text-zinc-400">{expense.note ?? `${meta.label} • ${expense.account?.name ?? "No account"}`}</p>
+                    </div>
+                    <p className="font-mono text-base text-red-300 md:text-lg">
+                      <span className="rupee-sign">₹</span> {Number(expense.amount).toFixed(2)}
+                    </p>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setActionMenuId((prev) => (prev === expense.id ? null : expense.id))}
+                        className="rounded-md border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800/70"
+                      >
+                        …
+                      </button>
+                      {actionMenuId === expense.id ? (
+                        <div className="absolute right-0 top-8 z-10 w-28 rounded-md border border-zinc-700 bg-zinc-900 p-1 shadow-xl">
+                          <button type="button" onClick={() => openEditModal(expense)} className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-zinc-800">
+                            Edit
+                          </button>
+                          <button type="button" onClick={() => void onDelete(expense)} className="block w-full rounded px-2 py-1 text-left text-xs text-red-300 hover:bg-zinc-800">
+                            Delete
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ))}
       </div>
 
       <div className="flex items-center justify-between rounded-md border border-zinc-800 bg-zinc-900 p-3 text-sm">
@@ -361,7 +454,7 @@ export function ExpensesManager({
           resetForm();
           setOpenModal(true);
         }}
-        className="fixed bottom-20 right-4 z-40 rounded-full bg-blue-600 px-5 py-3 text-2xl leading-none text-white shadow-lg hover:bg-blue-500 md:bottom-6"
+        className="fixed bottom-20 right-4 z-40 animate-pulse rounded-full bg-blue-600 px-6 py-4 text-3xl leading-none text-white shadow-lg hover:bg-blue-500 md:bottom-6"
       >
         +
       </button>

@@ -4,7 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase-server";
 export default async function SettingsPage() {
   const supabase = await createSupabaseServerClient();
   const [accountsRes, budgetsRes, presetsRes, settingsRes] = await Promise.all([
-    supabase.from("accounts").select("id, name").order("name", { ascending: true }),
+    supabase.from("accounts").select("id, name, balance").order("name", { ascending: true }),
     supabase
       .from("budgets")
       .select("id, category, monthly_limit, period, period_start, month, year")
