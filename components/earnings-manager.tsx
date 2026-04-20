@@ -52,7 +52,9 @@ export function EarningsManager({
   const totalMonthEarnings = items
     .filter((entry) => entry.date.slice(0, 7) === monthKey)
     .reduce((sum, entry) => sum + Number(entry.amount || 0), 0);
-  const liquidCash = accounts.reduce((sum, account) => sum + Number(account.balance || 0), 0);
+  const liquidCash = accounts
+  .filter((a) => !a.name.toLowerCase().includes("ppf"))
+  .reduce((sum, a) => sum + Number(a.balance || 0), 0);
   const bufferValue = Number(buffer || 0);
   const bufferProgress = bufferValue > 0 ? Math.min(100, (liquidCash / bufferValue) * 100) : 0;
 
