@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   title: "Finance Terminal",
   description: "Money dashboard with Supabase auth",
   applicationName: "Finance Terminal",
-  manifest: "/manifest.webmanifest",
+  manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     title: "Finance Terminal",

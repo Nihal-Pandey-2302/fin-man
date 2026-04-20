@@ -362,7 +362,7 @@ export function InvestmentsManager({
         <div className="min-w-0 rounded-xl border border-zinc-800 bg-zinc-900 p-4">
           <h2 className="text-sm font-semibold text-zinc-200">Allocation by type</h2>
           <div className="mt-3 h-72 min-h-[18rem] min-w-0">
-            <ResponsiveContainer width="99%" height="100%">
+            <ResponsiveContainer width="100%" height={288}>
               <PieChart>
                 <Pie data={allocation} dataKey="value" nameKey="name" innerRadius={60} outerRadius={95}>
                   {allocation.map((entry) => (

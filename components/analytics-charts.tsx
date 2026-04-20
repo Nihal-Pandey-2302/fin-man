@@ -55,7 +55,7 @@ export function AnalyticsCharts({
               <YAxis stroke="#a1a1aa" />
               <Tooltip formatter={(value) => `₹${Number(value ?? 0).toFixed(2)}`} />
               <Bar dataKey="value" fill="#3b82f6">
-                <LabelList dataKey="value" position="top" formatter={(value: number) => `₹${Number(value).toFixed(0)}`} />
+                <LabelList dataKey="value" position="top" formatter={(value: unknown) => `₹${Number(value ?? 0).toFixed(0)}`} />
               </Bar>
             </BarChart>
           </ResponsiveContainer>
