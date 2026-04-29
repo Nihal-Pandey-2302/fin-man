@@ -376,7 +376,7 @@ export function ExpensesManager({
             {groupedExpenses[dateKey].map((expense) => {
               const meta = categoryMeta(expense.category);
               return (
-                <article key={expense.id} className="rounded-xl border border-zinc-800 bg-zinc-900 p-3">
+                <article key={expense.id} className={`relative overflow-visible rounded-xl border border-zinc-800 bg-zinc-900 p-3 ${actionMenuId === expense.id ? "z-50" : ""}`}>
                   <div className="flex items-center gap-3">
                     <div className="flex min-w-0 items-center gap-2">
                       <span className="text-base">{meta.emoji}</span>
@@ -398,7 +398,7 @@ export function ExpensesManager({
                         …
                       </button>
                       {actionMenuId === expense.id ? (
-                        <div className="absolute right-0 top-8 z-10 w-28 rounded-md border border-zinc-700 bg-zinc-900 p-1 shadow-xl">
+                        <div className="absolute right-0 top-8 z-50 w-28 rounded-md border border-zinc-700 bg-zinc-900 p-1 shadow-xl">
                           <button type="button" onClick={() => openEditModal(expense)} className="block w-full rounded px-2 py-1 text-left text-xs hover:bg-zinc-800">
                             Edit
                           </button>
