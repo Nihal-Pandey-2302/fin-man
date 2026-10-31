@@ -4,7 +4,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { Account } from "../../shared/api";
 import type { Db } from "../db";
-import { ACCOUNT_KINDS, ACCOUNT_ROLES, accountNumbers, accounts, INSTITUTIONS, transactions } from "../db/schema";
+import { ACCOUNT_KINDS, ACCOUNT_ROLES, accountNumbers, accounts, autopays, INSTITUTIONS, transactions } from "../db/schema";
 import { computeBalances } from "../ledger/balances";
 import { reprocessUnparsed } from "../sms/ingest";
 import type { AppEnv } from "../types";
@@ -81,7 +81,9 @@ export const accountRoutes = new Hono<AppEnv>()
     const updated = await db.update(accounts).set(toRow(body)).where(eq(accounts.id, id)).returning({ id: accounts.id });
     if (!updated.length) return c.json({ error: "not_found" }, 404);
     if (body.numbers) await replaceNumbers(db, id, body.numbers);
-    const recovered = await reprocessUnparsed(db, true);
+    // Only changes that affect SMS → account matching can recover parked SMS.
+    const affectsMatching = body.numbers !== undefined || body.kind !== undefined || body.institution !== undefined || body.archived !== undefined;
+    const recovered = affectsMatching ? await reprocessUnparsed(db, true) : 0;
     return c.json({ id, recoveredSms: recovered });
   })
   /** Manual correction: "the balance (or card outstanding) is X right now". */
@@ -98,7 +100,9 @@ export const accountRoutes = new Hono<AppEnv>()
   .delete("/:id", idParam, async (c) => {
     const { id } = c.req.valid("param");
     const db = c.var.db;
-    const used = await db.select({ id: transactions.id }).from(transactions).where(eq(transactions.accountId, id)).limit(1).get();
+    const used =
+      (await db.select({ id: transactions.id }).from(transactions).where(eq(transactions.accountId, id)).limit(1).get()) ??
+      (await db.select({ id: autopays.id }).from(autopays).where(eq(autopays.accountId, id)).limit(1).get());
     if (used) {
       await db.update(accounts).set({ archived: true }).where(eq(accounts.id, id));
       return c.json({ archived: true });

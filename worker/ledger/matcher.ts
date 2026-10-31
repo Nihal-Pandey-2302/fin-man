@@ -12,15 +12,25 @@ export type PairOutcome =
 
 const tokens = (s: string) => s.toUpperCase().replace(/[^A-Z\s]/g, " ").split(/\s+/).filter(Boolean);
 
-/** "NIHAL P" / "NIHAL KUMAR PANDEY" vs owner "Nihal Pandey": every token of the shorter side prefixes one on the other. */
+/**
+ * Does a bank-printed name refer to the owner? Strict on purpose (a false match hides a real expense):
+ * the name needs ≥ 2 tokens, each matching a distinct token of one owner variant either exactly, as a
+ * single-letter initial ("NIHAL P"), or as a bank-truncated prefix of ≥ 4 letters ("PANDE"); and at least
+ * one token must match exactly. "NIHAL KAPOOR" never matches "Nihal K Pandey".
+ */
 export function isOwnerName(name: string, ownerNames: string[]): boolean {
-  const a = tokens(name);
-  if (!a.length) return false;
+  const printed = tokens(name);
+  if (printed.length < 2) return false;
   return ownerNames.some((owner) => {
-    const b = tokens(owner);
-    if (!b.length) return false;
-    const [short, long] = a.length <= b.length ? [a, b] : [b, a];
-    return short.length >= Math.min(2, long.length) && short.every((t) => long.some((l) => l.startsWith(t) || t.startsWith(l)));
+    const free = tokens(owner);
+    let exact = 0;
+    for (const t of printed) {
+      const i = free.findIndex((o) => o === t || (t.length === 1 && o.startsWith(t)) || (t.length >= 4 && o.startsWith(t)));
+      if (i < 0) return false;
+      if (free[i] === t) exact++;
+      free.splice(i, 1);
+    }
+    return exact >= 1;
   });
 }
 

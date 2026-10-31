@@ -13,8 +13,9 @@ export type CurrentCycle = {
 
 /**
  * The cycle containing `today`: the latest budget cycle that has started. An open cycle runs until the day
- * before the same date next month (salary detection closes it earlier when the next salary lands).
- * Without any cycle, falls back to the calendar month with no budget.
+ * before the same date next month (salary detection closes it earlier when the next salary lands). If that
+ * has passed with no newer cycle, monthly periods roll forward from its start date with the same budget
+ * (id null: not a stored cycle). Without any cycle, falls back to the calendar month with no budget.
  */
 export async function currentCycle(db: Db, today = istDate()): Promise<CurrentCycle> {
   const row = await db
@@ -25,11 +26,15 @@ export async function currentCycle(db: Db, today = istDate()): Promise<CurrentCy
     .limit(1)
     .get();
 
-  if (row && (!row.endDate || row.endDate >= today)) {
+  if (row) {
+    const end = row.endDate ?? addDays(addMonths(row.startDate, 1), -1);
+    if (end >= today) return { id: row.id, startDate: row.startDate, endDate: end, budgetPaise: row.plannedSpendPaise };
+    let n = 1;
+    while (addDays(addMonths(row.startDate, n + 1), -1) < today) n++;
     return {
-      id: row.id,
-      startDate: row.startDate,
-      endDate: row.endDate ?? addDays(addMonths(row.startDate, 1), -1),
+      id: null,
+      startDate: addMonths(row.startDate, n),
+      endDate: addDays(addMonths(row.startDate, n + 1), -1),
       budgetPaise: row.plannedSpendPaise,
     };
   }

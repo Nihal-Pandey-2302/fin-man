@@ -1,9 +1,9 @@
 import { zValidator } from "@hono/zod-validator";
-import { and, asc, desc, eq, isNull } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { categories, categoryBudgets, merchantRules, RULE_MATCH_TYPES, transactions, TXN_KINDS } from "../db/schema";
-import { findRule } from "../ledger/rules";
+import { applyRuleToUncategorized } from "../ledger/rules";
 import type { AppEnv } from "../types";
 import { id, idParam, text } from "./validators";
 
@@ -86,25 +86,5 @@ export const ruleRoutes = new Hono<AppEnv>()
     const db = c.var.db;
     const rule = await db.select().from(merchantRules).where(eq(merchantRules.id, c.req.valid("param").id)).get();
     if (!rule) return c.json({ error: "not_found" }, 404);
-    const applied = await applyRule(db, rule);
-    return c.json({ applied });
+    return c.json({ applied: await applyRuleToUncategorized(db, rule) });
   });
-
-/** Categorise uncategorised, unpaired transactions that `rule` matches. Returns how many changed. */
-export async function applyRule(db: AppEnv["Variables"]["db"], rule: typeof merchantRules.$inferSelect): Promise<number> {
-  const candidates = await db
-    .select({ id: transactions.id, merchant: transactions.merchant, vpa: transactions.counterpartyVpa, kind: transactions.kind })
-    .from(transactions)
-    .where(and(isNull(transactions.categoryId), isNull(transactions.transferGroupId)))
-    .all();
-  let applied = 0;
-  for (const t of candidates) {
-    if (!findRule([rule], t.merchant, t.vpa)) continue;
-    await db
-      .update(transactions)
-      .set({ categoryId: rule.categoryId, kind: rule.kindOverride ?? t.kind, status: "confirmed" })
-      .where(eq(transactions.id, t.id));
-    applied++;
-  }
-  return applied;
-}

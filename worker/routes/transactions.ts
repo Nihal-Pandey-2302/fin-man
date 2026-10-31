@@ -7,7 +7,7 @@ import { addDays, istDayStart } from "../../shared/time";
 import type { Db } from "../db";
 import { accounts, DIRECTIONS, INCOME_SOURCES, smsRaw, transactions, TXN_KINDS, TXN_STATUSES } from "../db/schema";
 import { unpairGroup } from "../ledger/matcher";
-import { findRule, learnRule } from "../ledger/rules";
+import { applyRuleToUncategorized, learnRule } from "../ledger/rules";
 import { processSms } from "../sms/ingest";
 import type { AppEnv } from "../types";
 import { date, id, idParam, instant, paise, text } from "./validators";
@@ -69,9 +69,14 @@ export async function updateTxn(db: Db, txnId: number, patch: Patch) {
   const { learn, occurredAt, ...fields } = patch;
   const kind = fields.kind ?? t.kind;
 
-  if (t.transferGroupId && fields.kind && fields.kind !== "transfer" && fields.kind !== "card_payment") {
-    await unpairGroup(db, t.transferGroupId);
-  }
+  // A paired leg whose kind, amount, direction or account changes no longer balances its counterpart:
+  // unpair both (the other leg goes back to the review inbox).
+  const breaksPair =
+    (fields.kind !== undefined && fields.kind !== "transfer" && fields.kind !== "card_payment") ||
+    (fields.amountPaise !== undefined && fields.amountPaise !== t.amountPaise) ||
+    (fields.direction !== undefined && fields.direction !== t.direction) ||
+    (fields.accountId !== undefined && fields.accountId !== t.accountId);
+  if (t.transferGroupId && breaksPair) await unpairGroup(db, t.transferGroupId);
 
   const [row] = await db
     .update(transactions)
@@ -79,7 +84,7 @@ export async function updateTxn(db: Db, txnId: number, patch: Patch) {
       ...fields,
       ...(occurredAt && { occurredAt: new Date(occurredAt) }),
       ...(kind !== "income" && { incomeSource: null }),
-      ...(fields.kind && fields.kind !== "transfer" && fields.kind !== "card_payment" && { transferGroupId: null }),
+
       status: fields.status ?? "confirmed",
     })
     .where(eq(transactions.id, txnId))
@@ -93,19 +98,7 @@ export async function updateTxn(db: Db, txnId: number, patch: Patch) {
     if (rule) {
       ruleId = rule.id;
       // Same merchant still waiting in the inbox → categorise those too.
-      const waiting = await db
-        .select()
-        .from(transactions)
-        .where(and(eq(transactions.status, "needs_review"), isNull(transactions.categoryId), isNull(transactions.transferGroupId)))
-        .all();
-      for (const w of waiting) {
-        if (w.id === txnId || !findRule([rule], w.merchant, w.counterpartyVpa)) continue;
-        await db
-          .update(transactions)
-          .set({ categoryId: rule.categoryId, kind: rule.kindOverride ?? w.kind, status: "confirmed" })
-          .where(eq(transactions.id, w.id));
-        appliedTo++;
-      }
+      appliedTo = await applyRuleToUncategorized(db, rule, { onlyNeedsReview: true, excludeId: txnId });
     }
   }
   return { txn: row, ruleId, appliedTo };
@@ -252,7 +245,7 @@ export const reviewRoutes = new Hono<AppEnv>()
     const db = c.var.db;
     const [txns, sms] = await Promise.all([
       db.select().from(transactions).where(eq(transactions.status, "needs_review")).orderBy(desc(transactions.occurredAt)).limit(200).all(),
-      db.select().from(smsRaw).where(eq(smsRaw.parseStatus, "unparsed")).orderBy(desc(smsRaw.receivedAt)).limit(100).all(),
+      db.select().from(smsRaw).where(inArray(smsRaw.parseStatus, ["unparsed", "error"])).orderBy(desc(smsRaw.receivedAt)).limit(100).all(),
     ]);
     return c.json({ transactions: txns, sms });
   })
@@ -263,7 +256,7 @@ export const reviewRoutes = new Hono<AppEnv>()
     // Only parked SMS are retried: a parsed one already has its transaction, an ignored one was
     // dismissed (or its transaction deleted) on purpose.
     if (row.parseStatus === "parsed") return c.json({ status: "duplicate", smsId: row.id });
-    if (row.parseStatus !== "unparsed") return c.json({ status: "ignored", smsId: row.id, reason: row.error });
+    if (row.parseStatus === "ignored") return c.json({ status: "ignored", smsId: row.id, reason: row.error });
     return c.json(await processSms(db, row));
   })
   .post("/sms/:id/dismiss", idParam, async (c) => {

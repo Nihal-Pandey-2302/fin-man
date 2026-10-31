@@ -22,7 +22,7 @@ const istDay = sql<string>`date((${transactions.occurredAt} + 19800000) / 1000, 
 export async function reviewCount(db: Db): Promise<number> {
   const [{ n }] = await db.all<{ n: number }>(sql`
     SELECT (SELECT COUNT(*) FROM ${transactions} WHERE ${transactions.status} = 'needs_review')
-         + (SELECT COUNT(*) FROM ${smsRaw} WHERE ${smsRaw.parseStatus} = 'unparsed') AS n`);
+         + (SELECT COUNT(*) FROM ${smsRaw} WHERE ${smsRaw.parseStatus} IN ('unparsed', 'error')) AS n`);
   return n;
 }
 

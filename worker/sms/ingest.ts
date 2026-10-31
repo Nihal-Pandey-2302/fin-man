@@ -24,8 +24,8 @@ export async function ingestSms(db: Db, input: IngestInput): Promise<IngestOutco
   const body = normalizeBody(input.body);
   const hash = await smsHash(sender, body);
 
+  if (!isBankSms(sender, body)) return { status: "rejected", reason: "unknown_sender" };
   const otp = isOtp(body);
-  if (!otp && !isBankSms(sender, body)) return { status: "rejected", reason: "unknown_sender" };
 
   const [row] = await db
     .insert(smsRaw)
@@ -50,7 +50,6 @@ export async function ingestSms(db: Db, input: IngestInput): Promise<IngestOutco
   return processSms(db, row);
 }
 
-/** Parse a stored SMS and create its transaction. Safe to re-run (e.g. after adding a missing account). */
 /** Retry SMS parked as unparsed (e.g. after adding the account they mention). */
 export async function reprocessUnparsed(db: Db, onlyMissingAccount = false): Promise<number> {
   const rows = await db
@@ -67,8 +66,19 @@ export async function reprocessUnparsed(db: Db, onlyMissingAccount = false): Pro
   return created;
 }
 
+/**
+ * Parse a stored SMS and create its transaction. Safe to re-run (e.g. after adding a missing account).
+ * A parser that throws on an odd message marks just that SMS as `error` (shown in the review inbox).
+ */
 export async function processSms(db: Db, row: SmsRow): Promise<IngestOutcome> {
-  const parsed = parseSms(row.body, row.receivedAt);
+  let parsed: ReturnType<typeof parseSms>;
+  try {
+    parsed = parseSms(row.body, row.receivedAt);
+  } catch (err) {
+    const error = `parser_error: ${err instanceof Error ? err.message : String(err)}`.slice(0, 200);
+    await setSmsStatus(db, row.id, "error", { error });
+    return { status: "unparsed", smsId: row.id, reason: error };
+  }
 
   if (!parsed) {
     const promo = isPromo(row.body);
