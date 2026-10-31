@@ -15,6 +15,7 @@ const CategoriesPage = lazy(() => import("@/pages/categories"));
 const SettingsPage = lazy(() => import("@/pages/settings"));
 const HoldingsPage = lazy(() => import("@/pages/holdings"));
 const ReportPage = lazy(() => import("@/pages/report"));
+const ImportPage = lazy(() => import("@/pages/import"));
 
 const fallback = (
   <div className="space-y-3">
@@ -43,6 +44,7 @@ export default function App() {
               <Route path="categories" element={<CategoriesPage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="holdings" element={<HoldingsPage />} />
+              <Route path="import" element={<ImportPage />} />
             </Route>
             <Route path="*" element={<p className="py-20 text-center text-muted-foreground">That page doesn't exist.</p>} />
           </Route>

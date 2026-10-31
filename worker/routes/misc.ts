@@ -3,6 +3,7 @@ import { asc, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import type { Bootstrap } from "../../shared/api";
+import { toIstInput } from "../../shared/time";
 import * as schema from "../db/schema";
 import { buildAlerts } from "../ledger/alerts";
 import { buildDashboard, reviewCount } from "../ledger/dashboard";
@@ -66,6 +67,33 @@ export const miscRoutes = new Hono<AppEnv>()
       await setSetting(c.var.db, key, value as never);
     }
     return c.json(await getSettings(c.var.db));
+  })
+  /** Transactions as CSV (IST times, rupees with 2 decimals) for spreadsheets. */
+  .get("/export.csv", async (c) => {
+    const db = c.var.db;
+    const [rows, accs, cats] = await Promise.all([
+      db.select().from(schema.transactions).orderBy(asc(schema.transactions.occurredAt), asc(schema.transactions.id)).all(),
+      db.select().from(schema.accounts).all(),
+      db.select().from(schema.categories).all(),
+    ]);
+    const name = (list: { id: number; name: string }[], id: number | null) => list.find((x) => x.id === id)?.name ?? "";
+    const cell = (v: unknown) => {
+      const s = v == null ? "" : String(v);
+      return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rupees = (p: number) => `${p < 0 ? "-" : ""}${Math.floor(Math.abs(p) / 100)}.${String(Math.abs(p) % 100).padStart(2, "0")}`;
+    const lines = [
+      ["date_ist", "time_ist", "account", "direction", "amount_inr", "kind", "category", "merchant", "vpa", "ref_no", "note", "status", "source"].join(","),
+      ...rows.map((t) => {
+        const ist = toIstInput(t.occurredAt);
+        return [ist.slice(0, 10), ist.slice(11), name(accs, t.accountId), t.direction, rupees(t.amountPaise), t.kind, name(cats, t.categoryId), t.merchant, t.counterpartyVpa, t.refNo, t.note, t.status, t.source]
+          .map(cell)
+          .join(",");
+      }),
+    ];
+    c.header("Content-Type", "text/csv; charset=utf-8");
+    c.header("Content-Disposition", `attachment; filename="fintrack-transactions-${new Date().toISOString().slice(0, 10)}.csv"`);
+    return c.body(`\uFEFF${lines.join("\r\n")}\r\n`);
   })
   .get("/export", async (c) => {
     const db = c.var.db;

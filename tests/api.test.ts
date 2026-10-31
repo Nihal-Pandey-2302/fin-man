@@ -238,3 +238,33 @@ describe("plan, settings, export", () => {
     expect(bad.status).toBe(400);
   });
 });
+
+describe("SMS backup import", () => {
+  it("ingests a batch through the same pipeline and stays idempotent", async () => {
+    await seedAccounts();
+    const messages = [
+      { sender: "VM-IDFCFB", body: fixture("idfc/upi_debit.txt"), receivedAt: Date.parse(at(10, 30)) },
+      { sender: "JD-IDFCFB-S", body: fixture("card/spend_rupay_swiggy.txt"), receivedAt: Date.parse(at(21)) },
+      { sender: "VM-RANDOM", body: "Your order shipped", receivedAt: Date.parse(at(9)) },
+    ];
+    expect(await json(api("/import/sms", { method: "POST", json: { messages } }))).toEqual({ created: 2, duplicate: 0, ignored: 0, unparsed: 0, rejected: 1 });
+    expect(await json(api("/import/sms", { method: "POST", json: { messages } }))).toMatchObject({ created: 0, duplicate: 2 });
+    const tooMany = Array.from({ length: 21 }, () => messages[0]);
+    expect((await api("/import/sms", { method: "POST", json: { messages: tooMany } })).status).toBe(400);
+  });
+});
+
+describe("CSV export", () => {
+  it("exports transactions with IST times, rupee amounts and quoted text", async () => {
+    const { cash } = await seedAccounts();
+    await api("/transactions", {
+      method: "POST",
+      json: { accountId: cash.id, amountPaise: 12_345, direction: "debit", kind: "expense", merchant: 'Chai, "Point"', occurredAt: istToUtc(2026, 10, 31, 20, 5).toISOString() },
+    });
+    const res = await api("/export.csv");
+    expect(res.headers.get("content-type")).toMatch(/text\/csv/);
+    const [header, row] = (await res.text()).replace(/^﻿/, "").trim().split("\r\n");
+    expect(header.startsWith("date_ist,time_ist,account,direction,amount_inr")).toBe(true);
+    expect(row).toBe('2026-10-31,20:05,Cash,debit,123.45,expense,,"Chai, ""Point""",,,,confirmed,manual');
+  });
+});

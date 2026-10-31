@@ -3,6 +3,7 @@ import { runDaily } from "./daily";
 import { getDb } from "./db";
 import { accountRoutes } from "./routes/accounts";
 import { categoryRoutes, ruleRoutes } from "./routes/categories";
+import { importRoutes } from "./routes/import";
 import { ingestRoutes } from "./routes/ingest";
 import { miscRoutes } from "./routes/misc";
 import { autopayRoutes, cycleRoutes, holdingRoutes, loanRoutes, presetRoutes } from "./routes/plan";
@@ -36,6 +37,7 @@ app
   .route("/loans", loanRoutes)
   .route("/holdings", holdingRoutes)
   .route("/push", pushRoutes)
+  .route("/import", importRoutes)
   .route("/", miscRoutes);
 
 app.notFound((c) => c.json({ error: "not_found" }, 404));

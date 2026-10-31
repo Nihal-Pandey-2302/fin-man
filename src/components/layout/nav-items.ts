@@ -1,4 +1,4 @@
-import { CalendarRange, Ellipsis, House, Landmark, PiggyBank, ReceiptText, Settings, Tags, type LucideIcon } from "lucide-react";
+import { CalendarRange, Ellipsis, FileUp, House, Landmark, PiggyBank, ReceiptText, Settings, Tags, type LucideIcon } from "lucide-react";
 
 export type NavItem = { to: string; label: string; icon: LucideIcon };
 
@@ -15,5 +15,6 @@ export const SIDEBAR_EXTRA: NavItem[] = [
   { to: "/more/accounts", label: "Accounts", icon: Landmark },
   { to: "/more/categories", label: "Categories & rules", icon: Tags },
   { to: "/more/holdings", label: "Holdings", icon: PiggyBank },
+  { to: "/more/import", label: "Import SMS", icon: FileUp },
   { to: "/more/settings", label: "Settings", icon: Settings },
 ];

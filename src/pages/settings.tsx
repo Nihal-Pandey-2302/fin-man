@@ -306,11 +306,18 @@ function AppearanceCard() {
             </button>
           ))}
         </div>
-        <Button variant="outline" asChild>
-          <a href="/api/export" download>
-            <Download /> Download backup (JSON)
-          </a>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" asChild>
+            <a href="/api/export" download>
+              <Download /> Full backup (JSON)
+            </a>
+          </Button>
+          <Button variant="outline" asChild>
+            <a href="/api/export.csv" download>
+              <Download /> Transactions (CSV)
+            </a>
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

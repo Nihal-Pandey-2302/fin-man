@@ -1,4 +1,4 @@
-import { ChevronRight, Landmark, PiggyBank, Settings, Tags } from "lucide-react";
+import { ChevronRight, FileUp, Landmark, PiggyBank, Settings, Tags } from "lucide-react";
 import { Link } from "react-router";
 import { Card } from "@/components/ui/card";
 
@@ -6,6 +6,7 @@ const LINKS = [
   { to: "/more/accounts", icon: Landmark, title: "Accounts", text: "Banks, card numbers, balances" },
   { to: "/more/categories", icon: Tags, title: "Categories & rules", text: "How merchants get categorised" },
   { to: "/more/holdings", icon: PiggyBank, title: "Holdings", text: "Mutual funds, stocks, FD, PPF" },
+  { to: "/more/import", icon: FileUp, title: "Import SMS backup", text: "Backfill history from an XML export" },
   { to: "/more/settings", icon: Settings, title: "Settings", text: "SMS setup, presets, theme, backup" },
 ];
 
