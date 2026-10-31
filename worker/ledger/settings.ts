@@ -8,6 +8,8 @@ export const SETTING_DEFAULTS = {
   owner_names: [] as string[],
   /** Money kept aside in bank balances; shown as "free after buffer". */
   liquid_buffer_paise: 0,
+  /** Extra kept in the autopay account on top of the autopays due (salary-day plan). */
+  autopay_buffer_paise: 0,
   /** Salary detection (Phase 2): employer name fragment and minimum amount. */
   salary_employer: "",
   salary_min_paise: 0,

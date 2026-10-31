@@ -1,10 +1,12 @@
 import { Hono } from "hono";
+import { runDaily } from "./daily";
 import { getDb } from "./db";
 import { accountRoutes } from "./routes/accounts";
 import { categoryRoutes, ruleRoutes } from "./routes/categories";
 import { ingestRoutes } from "./routes/ingest";
 import { miscRoutes } from "./routes/misc";
 import { autopayRoutes, cycleRoutes, holdingRoutes, loanRoutes, presetRoutes } from "./routes/plan";
+import { pushRoutes } from "./routes/push";
 import { reviewRoutes, transactionRoutes, transferRoutes } from "./routes/transactions";
 import type { AppEnv } from "./types";
 
@@ -33,6 +35,7 @@ app
   .route("/presets", presetRoutes)
   .route("/loans", loanRoutes)
   .route("/holdings", holdingRoutes)
+  .route("/push", pushRoutes)
   .route("/", miscRoutes);
 
 app.notFound((c) => c.json({ error: "not_found" }, 404));
@@ -42,4 +45,11 @@ app.onError((err, c) => {
 });
 
 export type AppType = typeof app;
-export default app;
+
+export default {
+  fetch: app.fetch,
+  /** Daily reminders (see `triggers.crons` in wrangler.jsonc). */
+  scheduled(_controller, env, ctx) {
+    ctx.waitUntil(runDaily(getDb(env.DB), env).then((r) => console.log("daily", r)));
+  },
+} satisfies ExportedHandler<Env>;

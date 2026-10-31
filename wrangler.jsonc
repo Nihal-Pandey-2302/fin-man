@@ -19,6 +19,10 @@
 			"migrations_dir": "migrations"
 		}
 	],
+	// 03:30 UTC = 09:00 IST: daily reminders (card due, autopays, salary, review inbox).
+	"triggers": {
+		"crons": ["30 3 * * *"]
+	},
 	"observability": {
 		"enabled": true
 	},

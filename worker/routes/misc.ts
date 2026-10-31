@@ -4,7 +4,10 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { Bootstrap } from "../../shared/api";
 import * as schema from "../db/schema";
+import { buildAlerts } from "../ledger/alerts";
 import { buildDashboard, reviewCount } from "../ledger/dashboard";
+import { buildReport } from "../ledger/report";
+import { buildSalaryPlan } from "../ledger/salary-plan";
 import { getSettings, setSetting, type Settings } from "../ledger/settings";
 import type { AppEnv } from "../types";
 import { listAccounts } from "./accounts";
@@ -13,6 +16,7 @@ const settingsSchema = z
   .object({
     owner_names: z.array(z.string().trim().min(2).max(60)).max(10),
     liquid_buffer_paise: z.number().int().min(0),
+    autopay_buffer_paise: z.number().int().min(0),
     salary_employer: z.string().trim().max(80),
     salary_min_paise: z.number().int().min(0),
   })
@@ -50,6 +54,11 @@ export const miscRoutes = new Hono<AppEnv>()
     return c.json({ accounts, categories, presets, settings, reviewCount: review } satisfies Bootstrap);
   })
   .get("/dashboard", async (c) => c.json(await buildDashboard(c.var.db)))
+  .get("/alerts", async (c) => c.json(await buildAlerts(c.var.db)))
+  .get("/salary-plan", async (c) => c.json(await buildSalaryPlan(c.var.db)))
+  .get("/report", zValidator("query", z.object({ start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() })), async (c) =>
+    c.json(await buildReport(c.var.db, c.req.valid("query").start)),
+  )
   .get("/settings", async (c) => c.json(await getSettings(c.var.db)))
   .patch("/settings", zValidator("json", settingsSchema), async (c) => {
     const body = c.req.valid("json");

@@ -205,6 +205,8 @@ export const transactions = sqliteTable(
     status: text({ enum: TXN_STATUSES }).notNull().default("confirmed"),
     incomeSource: text({ enum: INCOME_SOURCES }),
     loanId: integer().references(() => loans.id, { onDelete: "set null" }),
+    /** Set when this debit was matched to a scheduled autopay (marks that occurrence paid). */
+    autopayId: integer().references((): AnySQLiteColumn => autopays.id, { onDelete: "set null" }),
     note: text(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -231,6 +233,7 @@ export const transactions = sqliteTable(
     // Review inbox badge/list.
     index("transactions_needs_review_idx").on(t.occurredAt).where(sql`${t.status} = 'needs_review'`),
     index("transactions_loan_idx").on(t.loanId).where(sql`${t.loanId} is not null`),
+    index("transactions_autopay_idx").on(t.autopayId, t.occurredAt).where(sql`${t.autopayId} is not null`),
   ],
 );
 
@@ -372,3 +375,17 @@ export const settings = sqliteTable("settings", {
   key: text().primaryKey(),
   value: text().notNull(),
 });
+
+/** Browser push subscriptions (one per installed device/browser). */
+export const pushSubscriptions = sqliteTable(
+  "push_subscriptions",
+  {
+    id: id(),
+    endpoint: text().notNull(),
+    p256dh: text().notNull(),
+    auth: text().notNull(),
+    userAgent: text(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("push_subscriptions_endpoint_uq").on(t.endpoint)],
+);

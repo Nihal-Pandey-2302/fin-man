@@ -43,6 +43,8 @@ export default defineConfig({
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/api\//, /^\/cdn-cgi\//],
         cleanupOutdatedCaches: true,
+        // Web push: show notifications and open the right screen on tap (public/push-sw.js).
+        importScripts: ["/push-sw.js"],
         runtimeCaching: [
           {
             // Last-known numbers when offline; always fresh when online.

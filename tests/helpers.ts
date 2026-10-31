@@ -37,6 +37,7 @@ export async function resetLedger() {
   await db.delete(s.loanPayments);
   await db.delete(s.categoryBudgets);
   await db.delete(s.budgetCycles);
+  await db.delete(s.pushSubscriptions);
   await db.delete(s.transactions);
   await db.delete(s.smsRaw);
   await db.delete(s.autopays);

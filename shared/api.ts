@@ -48,6 +48,7 @@ export type Account = Jsonify<typeof accounts.$inferSelect> & { numbers: Account
 export type Settings = {
   owner_names: string[];
   liquid_buffer_paise: number;
+  autopay_buffer_paise: number;
   salary_employer: string;
   salary_min_paise: number;
 };
@@ -63,6 +64,60 @@ export type Bootstrap = {
 export type Page<T> = { items: T[]; nextCursor: string | null };
 
 export type Review = { transactions: Txn[]; sms: Sms[] };
+
+export type SalaryPlan = {
+  cycleStart: string;
+  cycleEnd: string;
+  salaryTxnId: number | null;
+  salaryPaise: number;
+  salaryAccountId: number | null;
+  items: {
+    key: "card_bill" | "spending" | "autopays";
+    label: string;
+    fromAccountId: number;
+    toAccountId: number;
+    /** Still to move now. */
+    needPaise: number;
+    /** Already moved from the salary account this cycle. */
+    sentPaise: number;
+    done: boolean;
+  }[];
+  /** What stays in the salary account after the remaining moves. */
+  keepPaise: number;
+};
+
+export type Occurrence = {
+  autopayId: number;
+  name: string;
+  kind: Autopay["kind"];
+  accountId: number;
+  amountPaise: number;
+  dueOn: string;
+  status: "paid" | "due" | "overdue";
+  transactionId: number | null;
+};
+
+export type Alert = {
+  key: string;
+  level: "info" | "warn" | "danger";
+  title: string;
+  body: string;
+  href?: string;
+};
+
+export type Report = {
+  startDate: string;
+  endDate: string;
+  daysElapsed: number;
+  spendPaise: number;
+  incomePaise: number;
+  investedPaise: number;
+  previous: { startDate: string; endDate: string; spendPaise: number } | null;
+  byCategory: { categoryId: number | null; spendPaise: number; previousPaise: number }[];
+  topMerchants: { merchant: string; spendPaise: number; count: number }[];
+  biggest: Txn[];
+  periods: { startDate: string; endDate: string }[];
+};
 
 export type CategorySpend = { categoryId: number | null; spentPaise: number; limitPaise: number | null };
 
@@ -89,4 +144,5 @@ export type Dashboard = {
   upcomingAutopays: (Autopay & { dueOn: string })[];
   recent: Txn[];
   reviewCount: number;
+  alerts: Alert[];
 };

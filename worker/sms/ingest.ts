@@ -1,7 +1,8 @@
 import { and, eq, like } from "drizzle-orm";
 import type { Db } from "../db";
 import { accountNumbers, accounts, smsRaw, transactions } from "../db/schema";
-import { pairTransaction } from "../ledger/matcher";
+import { applyAutopayNotice } from "../ledger/autopays";
+import { settleNewTransaction } from "../ledger/settle";
 import { bumpRuleHits, findRule, loadRules } from "../ledger/rules";
 import { isOtp, isPromo } from "./classify";
 import { normalizeBody, normalizeSender, smsHash } from "./normalize";
@@ -91,6 +92,7 @@ export async function processSms(db: Db, row: SmsRow): Promise<IngestOutcome> {
 
   if (result.type === "notice") {
     await setSmsStatus(db, row.id, "ignored", { parser, parsedJson, error: result.notice });
+    await applyAutopayNotice(db, result);
     return { status: "ignored", smsId: row.id, reason: result.notice };
   }
 
@@ -136,7 +138,7 @@ export async function processSms(db: Db, row: SmsRow): Promise<IngestOutcome> {
   await setSmsStatus(db, row.id, "parsed", { parser, parsedJson });
   if (!txn) return { status: "duplicate", smsId: row.id };
   if (rule) await bumpRuleHits(db, rule.id);
-  await pairTransaction(db, txn.id);
+  await settleNewTransaction(db, txn.id);
   return { status: "created", smsId: row.id, transactionId: txn.id };
 }
 

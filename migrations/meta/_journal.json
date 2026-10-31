@@ -22,6 +22,13 @@
       "when": 1793473941186,
       "tag": "0002_seed_merchant_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1793476173063,
+      "tag": "0003_autopay_link_push",
+      "breakpoints": true
     }
   ]
 }

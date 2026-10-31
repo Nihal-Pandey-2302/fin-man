@@ -3,6 +3,7 @@ import type { Dashboard } from "../../shared/api";
 import { addDays, daysBetween, istDate, istDayStart } from "../../shared/time";
 import type { Db } from "../db";
 import { accounts, autopays, categoryBudgets, smsRaw, transactions } from "../db/schema";
+import { buildAlerts } from "./alerts";
 import { computeBalances } from "./balances";
 import { currentCycle } from "./cycles";
 import { getSetting } from "./settings";
@@ -11,13 +12,22 @@ import { getSetting } from "./settings";
  * Spending = expense + fee debits, minus refunds. Transfers, card payments, income and investments
  * (SIPs, stock purchases) never count, so moving money between your own accounts can't double count.
  */
-const SPEND = sql`CASE
+export const SPEND = sql`CASE
   WHEN ${transactions.kind} IN ('expense', 'fee') AND ${transactions.direction} = 'debit' THEN ${transactions.amountPaise}
   WHEN ${transactions.kind} = 'refund' AND ${transactions.direction} = 'credit' THEN -${transactions.amountPaise}
   ELSE 0 END`;
 
 /** IST calendar day of an epoch-ms column, as YYYY-MM-DD. */
 const istDay = sql<string>`date((${transactions.occurredAt} + 19800000) / 1000, 'unixepoch')`;
+
+/** Spending (see SPEND) between two instants. */
+export async function spentBetween(db: Db, from: Date, to: Date): Promise<number> {
+  const [row] = await db
+    .select({ spent: sql<number>`COALESCE(SUM(${SPEND}), 0)` })
+    .from(transactions)
+    .where(and(gte(transactions.occurredAt, from), lt(transactions.occurredAt, to)));
+  return row.spent;
+}
 
 export async function reviewCount(db: Db): Promise<number> {
   const [{ n }] = await db.all<{ n: number }>(sql`
@@ -33,7 +43,7 @@ export async function buildDashboard(db: Db, now = new Date()): Promise<Dashboar
   const to = istDayStart(addDays(cycle.endDate, 1));
   const inCycle = and(gte(transactions.occurredAt, from), lt(transactions.occurredAt, to));
 
-  const [daily, byCategory, limits, dueAutopays, recent, accountRows, buffer, review] = await Promise.all([
+  const [daily, byCategory, limits, dueAutopays, recent, accountRows, buffer, review, alerts] = await Promise.all([
     db
       .select({ date: istDay, spentPaise: sql<number>`SUM(${SPEND})` })
       .from(transactions)
@@ -60,6 +70,7 @@ export async function buildDashboard(db: Db, now = new Date()): Promise<Dashboar
     db.select().from(accounts).where(eq(accounts.archived, false)).all(),
     getSetting(db, "liquid_buffer_paise"),
     reviewCount(db),
+    buildAlerts(db, today),
   ]);
 
   const spentPaise = daily.reduce((s, d) => s + d.spentPaise, 0);
@@ -102,6 +113,7 @@ export async function buildDashboard(db: Db, now = new Date()): Promise<Dashboar
     upcomingAutopays: dueAutopays.map((a) => ({ ...a, createdAt: a.createdAt.toISOString(), updatedAt: a.updatedAt.toISOString(), dueOn: a.nextDueOn })),
     recent: recent.map(serializeTxn),
     reviewCount: review,
+    alerts,
   };
 }
 

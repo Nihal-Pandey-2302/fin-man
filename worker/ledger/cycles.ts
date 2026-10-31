@@ -1,4 +1,4 @@
-import { desc, lte } from "drizzle-orm";
+import { and, desc, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { addDays, addMonths, istDate, parseDate } from "../../shared/time";
 import type { Db } from "../db";
 import { budgetCycles } from "../db/schema";
@@ -41,4 +41,26 @@ export async function currentCycle(db: Db, today = istDate()): Promise<CurrentCy
   const { y, m } = parseDate(today);
   const start = `${y}-${String(m).padStart(2, "0")}-01`;
   return { id: null, startDate: start, endDate: addDays(addMonths(start, 1), -1), budgetPaise: 0 };
+}
+
+/** Start (or update) the cycle beginning on `startDate`; the previous open cycle ends the day before. */
+export async function startCycle(db: Db, body: { startDate: string; plannedSpendPaise: number; incomePaise?: number; salaryTxnId?: number | null }) {
+  const [row] = await db
+    .insert(budgetCycles)
+    .values(body)
+    .onConflictDoUpdate({
+      target: budgetCycles.startDate,
+      set: {
+        plannedSpendPaise: body.plannedSpendPaise,
+        ...(body.incomePaise !== undefined && { incomePaise: body.incomePaise }),
+        ...(body.salaryTxnId !== undefined && { salaryTxnId: body.salaryTxnId }),
+      },
+    })
+    .returning();
+  const dayBefore = addDays(body.startDate, -1);
+  await db
+    .update(budgetCycles)
+    .set({ endDate: dayBefore })
+    .where(and(lt(budgetCycles.startDate, body.startDate), or(isNull(budgetCycles.endDate), sql`${budgetCycles.endDate} > ${dayBefore}`)));
+  return row;
 }

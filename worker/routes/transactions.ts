@@ -7,6 +7,8 @@ import { addDays, istDayStart } from "../../shared/time";
 import type { Db } from "../db";
 import { accounts, DIRECTIONS, INCOME_SOURCES, smsRaw, transactions, TXN_KINDS, TXN_STATUSES } from "../db/schema";
 import { unpairGroup } from "../ledger/matcher";
+import { detectSalary } from "../ledger/salary";
+import { settleNewTransaction } from "../ledger/settle";
 import { applyRuleToUncategorized, learnRule } from "../ledger/rules";
 import { processSms } from "../sms/ingest";
 import type { AppEnv } from "../types";
@@ -101,6 +103,8 @@ export async function updateTxn(db: Db, txnId: number, patch: Patch) {
       appliedTo = await applyRuleToUncategorized(db, rule, { onlyNeedsReview: true, excludeId: txnId });
     }
   }
+  // Marking a credit as salary starts the new budget cycle.
+  if (fields.incomeSource === "salary" && t.incomeSource !== "salary") await detectSalary(db, txnId);
   return { txn: row, ruleId, appliedTo };
 }
 
@@ -177,6 +181,7 @@ export const transactionRoutes = new Hono<AppEnv>()
     if (fields.categoryId && fields.merchant && fields.kind !== "transfer" && fields.kind !== "card_payment") {
       await learnRule(db, fields.merchant, fields.categoryId, OVERRIDE_KINDS.has(fields.kind) ? fields.kind : null);
     }
+    await settleNewTransaction(db, row.id);
     return c.json(row, 201);
   })
   .patch("/:id", idParam, zValidator("json", patchSchema), async (c) => {

@@ -1,8 +1,8 @@
 import { zValidator } from "@hono/zod-validator";
-import { and, asc, desc, eq, isNull, lt, or, sql } from "drizzle-orm";
+import { asc, desc, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
-import { addDays, addMonths, istDate, nextDayOfMonth } from "../../shared/time";
+import { istDate, nextDayOfMonth } from "../../shared/time";
 import type { Db } from "../db";
 import {
   AUTOPAY_KINDS,
@@ -17,7 +17,8 @@ import {
   loans,
   quickAddPresets,
 } from "../db/schema";
-import { currentCycle } from "../ledger/cycles";
+import { advanceAutopay, autopayCalendar } from "../ledger/autopays";
+import { currentCycle, startCycle } from "../ledger/cycles";
 import type { AppEnv } from "../types";
 import { date, dayOfMonth, id, idParam, paise, text } from "./validators";
 
@@ -28,28 +29,6 @@ const cycleSchema = z.object({
   incomePaise: z.number().int().min(0).optional(),
   salaryTxnId: id.nullish(),
 });
-
-/** Start (or update) the cycle beginning on `startDate`; the previous open cycle ends the day before. */
-export async function startCycle(db: Db, body: z.infer<typeof cycleSchema>) {
-  const [row] = await db
-    .insert(budgetCycles)
-    .values(body)
-    .onConflictDoUpdate({
-      target: budgetCycles.startDate,
-      set: {
-        plannedSpendPaise: body.plannedSpendPaise,
-        ...(body.incomePaise !== undefined && { incomePaise: body.incomePaise }),
-        ...(body.salaryTxnId !== undefined && { salaryTxnId: body.salaryTxnId }),
-      },
-    })
-    .returning();
-  const dayBefore = addDays(body.startDate, -1);
-  await db
-    .update(budgetCycles)
-    .set({ endDate: dayBefore })
-    .where(and(lt(budgetCycles.startDate, body.startDate), or(isNull(budgetCycles.endDate), sql`${budgetCycles.endDate} > ${dayBefore}`)));
-  return row;
-}
 
 export const cycleRoutes = new Hono<AppEnv>()
   .get("/", async (c) => {
@@ -106,19 +85,14 @@ const autopaySchema = z.object({
   matchHint: text(80).nullish(),
 });
 
-const MONTHS_PER = { monthly: 1, quarterly: 3, yearly: 12 } as const;
-
-/** Move an autopay's due date one period forward (after it's been paid). */
-export async function advanceAutopay(db: Db, autopayId: number) {
-  const a = await db.select().from(autopays).where(eq(autopays.id, autopayId)).get();
-  if (!a) return null;
-  const nextDueOn = addMonths(a.nextDueOn, MONTHS_PER[a.frequency], a.dayOfMonth);
-  const [row] = await db.update(autopays).set({ nextDueOn }).where(eq(autopays.id, autopayId)).returning();
-  return row;
-}
-
 export const autopayRoutes = new Hono<AppEnv>()
   .get("/", async (c) => c.json(await c.var.db.select().from(autopays).orderBy(desc(autopays.active), asc(autopays.nextDueOn)).all()))
+  /** Occurrences in the current cycle (or ?from&to), marked paid / due / overdue. */
+  .get("/calendar", zValidator("query", z.object({ from: date.optional(), to: date.optional() })), async (c) => {
+    const q = c.req.valid("query");
+    const cycle = await currentCycle(c.var.db);
+    return c.json(await autopayCalendar(c.var.db, q.from ?? cycle.startDate, q.to ?? cycle.endDate));
+  })
   .post("/", zValidator("json", autopaySchema), async (c) => {
     const body = c.req.valid("json");
     const [row] = await c.var.db

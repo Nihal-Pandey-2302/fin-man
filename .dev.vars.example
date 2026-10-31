@@ -1,2 +1,7 @@
 # Copy to .dev.vars for local dev. In production this is a Worker secret (`wrangler secret put INGEST_SECRET`).
 INGEST_SECRET=dev-ingest-secret
+
+# Web push (optional). Generate with `npm run vapid`.
+# VAPID_PUBLIC_KEY=
+# VAPID_PRIVATE_KEY=
+# VAPID_SUBJECT=mailto:you@example.com
