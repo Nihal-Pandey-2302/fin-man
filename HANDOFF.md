@@ -30,14 +30,21 @@ Read this first if you're resuming after a context reset. Then read CLAUDE.md an
 - [x] 1. CLAUDE.md + git (`revamp` branch; old app at tag `legacy-nextjs`)
 - [x] 2. Scaffold (c37bf06)
 - [x] 3. Schema + migrations (256053f, then regenerated tonight)
-- [ ] 4. SMS ingest endpoint + parser framework + bank parsers + fixture tests
-- [ ] 5. API: accounts (+numbers, balances), categories, rules, transactions, review, dashboard, cycles, autopays, presets, settings, export
+- [x] 4. SMS ingest endpoint + parser framework + bank parsers + fixture tests (worker/sms/*, tests/parsers|ingest.test.ts)
+- [x] 5. API: accounts (+numbers, balances), categories, rules, transactions, review, dashboard, cycles, autopays, presets, loans, holdings, settings, export, bootstrap (worker/routes/*, tests/api.test.ts)
 - [ ] 6. UI: providers (react-query, theme, toasts), accounts setup, review inbox (swipe), quick add (keypad, 3 taps), dashboard, transactions list/edit, categories & rules, settings
-- [ ] 7. Matcher: transfers / card payments (±2 days IST, owner names setting)
+- [x] 7. Matcher: transfers / card payments (worker/ledger/matcher.ts; runs on every SMS insert)
 - [ ] 8. PWA (vite-plugin-pwa, icons), route code-splitting
 - [ ] 9. `npm run backup` (wrangler d1 execute → JSON) + /api/export
 - [ ] 10. Review pass (simplify / code-review), browser check with `run`
 - [ ] Phase 2: salary detection → budget cycles, salary-day plan, autopay calendar + matching + low-balance warning, card reminders, monthly report
+
+## API notes
+- Spending = expense + fee debits − refund credits. Transfers, card_payment, income and investment never count, and SIP autopays are excluded from "autopays still due".
+- Dashboard: dailyAllowance = (budget − spent before today − non-SIP autopays due by cycle end) ÷ days left including today; leftToday = allowance − spent today.
+- A cycle is the latest budget_cycles row with start ≤ today; an open one ends start+1 month−1. With no cycle, the calendar month with budget 0 is used.
+- Balances: anchored on the newer of the latest SMS balance/available limit and the opening/manual correction (POST /accounts/:id/balance).
+- GitHub push needs the noreply email: repo-local user.email = 127308117+Nihal-Pandey-2302@users.noreply.github.com (already set).
 
 ## Where things are
 - Worker: `worker/index.ts` (Hono, basePath /api) · `worker/db/{schema,index}.ts` · `worker/sms/*` (ingest pipeline + parsers) · `worker/routes/*`

@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, like } from "drizzle-orm";
 import type { Db } from "../db";
 import { accountNumbers, accounts, smsRaw, transactions } from "../db/schema";
 import { pairTransaction } from "../ledger/matcher";
@@ -51,6 +51,22 @@ export async function ingestSms(db: Db, input: IngestInput): Promise<IngestOutco
 }
 
 /** Parse a stored SMS and create its transaction. Safe to re-run (e.g. after adding a missing account). */
+/** Retry SMS parked as unparsed (e.g. after adding the account they mention). */
+export async function reprocessUnparsed(db: Db, onlyMissingAccount = false): Promise<number> {
+  const rows = await db
+    .select()
+    .from(smsRaw)
+    .where(
+      onlyMissingAccount
+        ? and(eq(smsRaw.parseStatus, "unparsed"), like(smsRaw.error, "no_account:%"))
+        : eq(smsRaw.parseStatus, "unparsed"),
+    )
+    .all();
+  let created = 0;
+  for (const row of rows) if ((await processSms(db, row)).status === "created") created++;
+  return created;
+}
+
 export async function processSms(db: Db, row: SmsRow): Promise<IngestOutcome> {
   const parsed = parseSms(row.body, row.receivedAt);
 
