@@ -46,6 +46,12 @@ Both dev servers share the local D1 in `.wrangler/state`. Delete that folder to 
 - **SMS ingest is idempotent.** `sms_raw.hash` is UNIQUE and equals SHA-256 of the normalized sender plus the body. A retry (MacroDroid resend or backup-XML import) must hit the unique constraint and return success without creating anything. Ingest must never create a transaction twice for one `sms_raw` row.
 - **Every SMS is stored in `sms_raw`**, even when parsing fails (`parse_status` = `parsed` | `unparsed` | `ignored` | `error`). OTP and promotional messages are dropped again on the server as `ignored`.
 
+- **Storage conventions** (see `worker/db/schema.ts`, which is the source of truth for the data model; PLAN.md §3 was the sketch):
+  - Instants are integer epoch ms (`timestamp_ms`, so they are `Date` in TS).
+  - Calendar dates (cycle start, due/paid/opened dates) are `YYYY-MM-DD` text, already in IST.
+  - TS keys are camelCase and SQL columns are snake_case via `casing: "snake_case"`. Always get the client from `getDb()` in `worker/db/index.ts`, never call `drizzle()` directly.
+  - Enums are enforced by CHECK constraints in the DB, not just in TS.
+
 ## Ledger rules (one ledger, no double counting)
 
 - **Own-account transfer:** two rows, a debit and a credit, with the same `transfer_group_id`, both `kind=transfer`. Never counted as spending or income.

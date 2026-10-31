@@ -1,0 +1,23 @@
+-- Default categories (editable in the app). is_essential feeds safe-to-spend and reports.
+INSERT INTO `categories` (`name`, `emoji`, `color`, `is_essential`, `sort_order`) VALUES
+  ('Food & dining',      '🍔', '#f97316', 0, 10),
+  ('Groceries',          '🛒', '#22c55e', 1, 20),
+  ('Transport',          '🚕', '#3b82f6', 1, 30),
+  ('Fuel',               '⛽', '#0ea5e9', 1, 40),
+  ('Shopping',           '🛍️', '#a855f7', 0, 50),
+  ('Bills & utilities',  '💡', '#eab308', 1, 60),
+  ('Rent',               '🏠', '#ef4444', 1, 70),
+  ('Subscriptions',      '📱', '#06b6d4', 0, 80),
+  ('EMI',                '🏦', '#dc2626', 1, 90),
+  ('Insurance',          '🛡️', '#14b8a6', 1, 100),
+  ('Health',             '💊', '#10b981', 1, 110),
+  ('Education',          '📚', '#facc15', 0, 120),
+  ('Entertainment',      '🎬', '#ec4899', 0, 130),
+  ('Travel',             '✈️', '#6366f1', 0, 140),
+  ('Personal care',      '💇', '#f472b6', 0, 150),
+  ('Gifts & donations',  '🎁', '#fb7185', 0, 160),
+  ('Fees & charges',     '🧾', '#94a3b8', 0, 170),
+  ('Investments',        '📈', '#16a34a', 0, 180),
+  ('Salary',             '💼', '#22c55e', 0, 190),
+  ('Other income',       '💰', '#84cc16', 0, 200),
+  ('Misc',               '⚪', '#a1a1aa', 0, 999);
