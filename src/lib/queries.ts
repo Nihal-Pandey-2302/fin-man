@@ -1,6 +1,6 @@
 import { keepPreviousData, QueryClient, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import type { Autopay, Bootstrap, Category, Cycle, Dashboard, Holding, Loan, Page, Review, Rule, Settings, Txn } from "@shared/api";
+import type { Autopay, Bootstrap, Category, Cycle, Dashboard, Holding, Loan, Occurrence, Page, Report, Review, Rule, SalaryPlan, Settings, Txn } from "@shared/api";
 import { api, errorMessage } from "./api";
 
 export const queryClient = new QueryClient({
@@ -20,11 +20,14 @@ export const keys = {
   autopays: ["autopays"] as const,
   loans: ["loans"] as const,
   holdings: ["holdings"] as const,
+  salaryPlan: ["salary-plan"] as const,
+  calendar: ["autopay-calendar"] as const,
+  report: (start?: string) => ["report", start ?? "current"] as const,
 };
 
 /** Money moved: anything derived from the ledger is stale. */
 export function invalidateLedger(qc = queryClient) {
-  for (const key of [keys.bootstrap, keys.dashboard, keys.review, ["transactions"], keys.rules, keys.loans]) {
+  for (const key of [keys.bootstrap, keys.dashboard, keys.review, ["transactions"], keys.rules, keys.loans, keys.salaryPlan, keys.calendar, keys.autopays, keys.cycles, ["report"]]) {
     void qc.invalidateQueries({ queryKey: key });
   }
 }
@@ -36,6 +39,10 @@ export const useRules = () => useQuery({ queryKey: keys.rules, queryFn: () => ap
 export const useCycles = () => useQuery({ queryKey: keys.cycles, queryFn: () => api<(Cycle & { budgets: { categoryId: number; limitPaise: number }[] })[]>("/cycles") });
 export const useAutopays = () => useQuery({ queryKey: keys.autopays, queryFn: () => api<Autopay[]>("/autopays") });
 export const useLoans = () => useQuery({ queryKey: keys.loans, queryFn: () => api<Loan[]>("/loans") });
+export const useSalaryPlan = () => useQuery({ queryKey: keys.salaryPlan, queryFn: () => api<SalaryPlan>("/salary-plan") });
+export const useAutopayCalendar = () => useQuery({ queryKey: keys.calendar, queryFn: () => api<Occurrence[]>("/autopays/calendar") });
+export const useReport = (start?: string) =>
+  useQuery({ queryKey: keys.report(start), queryFn: () => api<Report>(`/report${start ? `?start=${start}` : ""}`), placeholderData: keepPreviousData });
 export const useHoldings = () => useQuery({ queryKey: keys.holdings, queryFn: () => api<Holding[]>("/holdings") });
 
 export type TxnFilters = {

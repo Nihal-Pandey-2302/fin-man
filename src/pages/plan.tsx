@@ -1,5 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { CalendarCheck, HandCoins, Plus, Trash2 } from "lucide-react";
+import { BarChart3, CalendarCheck, Check, HandCoins, Plus, Trash2 } from "lucide-react";
+import { Link } from "react-router";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { cn } from "cn";
@@ -7,6 +8,7 @@ import type { Autopay, Loan } from "@shared/api";
 import { formatPaise, rupeesToPaise } from "@shared/money";
 import { formatShortDate, istDate } from "@shared/time";
 import { Money } from "@/components/money";
+import { SalaryPlanCard } from "@/components/salary-plan-card";
 import { NativeSelect } from "@/components/native-select";
 import { ResponsiveSheet } from "@/components/responsive-sheet";
 import { RupeeInput } from "@/components/rupee-input";
@@ -19,14 +21,23 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { del, patch, post, put } from "@/lib/api";
-import { invalidateLedger, keys, useAutopays, useCycles, useDashboard, useLoans, useLookups } from "@/lib/queries";
+import { invalidateLedger, keys, useAutopayCalendar, useAutopays, useCycles, useDashboard, useLoans, useLookups, useSalaryPlan } from "@/lib/queries";
 
 export default function PlanPage() {
+  const { data: plan } = useSalaryPlan();
   return (
     <div className="space-y-4">
-      <h1 className="font-heading text-2xl font-semibold">Plan</h1>
+      <header className="flex items-center justify-between">
+        <h1 className="font-heading text-2xl font-semibold">Plan</h1>
+        <Button variant="outline" size="sm" asChild>
+          <Link to="/plan/report">
+            <BarChart3 /> Report
+          </Link>
+        </Button>
+      </header>
       <div className="grid gap-4 lg:grid-cols-2">
         <CycleCard />
+        {plan && <SalaryPlanCard plan={plan} />}
         <AutopaysCard />
         <LoansCard />
       </div>
@@ -191,6 +202,7 @@ function AutopaysCard() {
   const { account } = useLookups();
   const qc = useQueryClient();
   const [editing, setEditing] = useState<Autopay | "new" | null>(null);
+  const [view, setView] = useState<"list" | "calendar">("calendar");
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: keys.autopays });
     invalidateLedger(qc);
@@ -211,9 +223,19 @@ function AutopaysCard() {
         </Button>
       </CardHeader>
       <CardContent className="space-y-1">
+        {!!data?.length && (
+          <div className="mb-2 grid w-fit grid-cols-2 gap-1 rounded-lg bg-muted p-1 text-sm">
+            {(["calendar", "list"] as const).map((v) => (
+              <button key={v} type="button" onClick={() => setView(v)} className={cn("h-8 rounded-md px-3", view === v ? "bg-background font-medium shadow-sm" : "text-muted-foreground")}>
+                {v === "calendar" ? "This cycle" : "All"}
+              </button>
+            ))}
+          </div>
+        )}
         {isPending && <Skeleton className="h-24" />}
         {data?.length === 0 && <p className="text-sm text-muted-foreground">Add the debits that hit your autopay account so they're kept out of safe-to-spend.</p>}
-        {data?.map((a) => (
+        {view === "calendar" && !!data?.length && <AutopayCalendar onOpen={(id) => setEditing(data.find((a) => a.id === id) ?? null)} />}
+        {view === "list" && data?.map((a) => (
           <button
             key={a.id}
             type="button"
@@ -386,6 +408,39 @@ function AutopayForm({ initial, onDone }: { initial: Autopay | null; onDone: () 
         </Button>
       </div>
     </form>
+  );
+}
+
+const STATUS_STYLE = {
+  paid: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  due: "bg-muted text-muted-foreground",
+  overdue: "bg-destructive/15 text-destructive",
+} as const;
+
+function AutopayCalendar({ onOpen }: { onOpen: (autopayId: number) => void }) {
+  const { data, isPending } = useAutopayCalendar();
+  const { account } = useLookups();
+  if (isPending) return <Skeleton className="h-24" />;
+  if (!data?.length) return <p className="text-sm text-muted-foreground">Nothing scheduled this cycle.</p>;
+  const left = data.filter((o) => o.status !== "paid").reduce((s, o) => s + o.amountPaise, 0);
+  return (
+    <div className="space-y-1">
+      {data.map((o) => (
+        <button key={`${o.autopayId}-${o.dueOn}`} type="button" onClick={() => onOpen(o.autopayId)} className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-muted/60">
+          <span className="w-14 shrink-0 text-sm text-muted-foreground tabular-nums">{formatShortDate(o.dueOn)}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-medium">{o.name}</span>
+            <span className="block truncate text-xs text-muted-foreground">{account(o.accountId)?.name}</span>
+          </span>
+          <span className={cn("flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium", STATUS_STYLE[o.status])}>
+            {o.status === "paid" && <Check className="size-3" />}
+            {o.status}
+          </span>
+          <Money paise={o.amountPaise} className="w-20 text-right font-medium" />
+        </button>
+      ))}
+      <p className="px-2 pt-1 text-right text-xs text-muted-foreground">{formatPaise(left)} still to go this cycle</p>
+    </div>
   );
 }
 

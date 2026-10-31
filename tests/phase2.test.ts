@@ -52,6 +52,8 @@ describe("salary detection", () => {
     expect(await cycles()).toHaveLength(0);
     await api(`/transactions/${t.id}`, { method: "PATCH", json: { incomeSource: "salary" } });
     expect((await cycles()).map((c) => [c.startDate, c.salaryTxnId])).toEqual([["2026-10-31", t.id]]);
+    const salary = await db.select().from(schema.categories).where(eq(schema.categories.name, "Salary")).get();
+    expect(await db.select().from(schema.transactions).where(eq(schema.transactions.id, t.id)).get()).toMatchObject({ categoryId: salary!.id, status: "confirmed" });
   });
 
   it("re-anchors a cycle the owner started by hand a few days before payday", async () => {

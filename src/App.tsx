@@ -14,6 +14,7 @@ const AccountsPage = lazy(() => import("@/pages/accounts"));
 const CategoriesPage = lazy(() => import("@/pages/categories"));
 const SettingsPage = lazy(() => import("@/pages/settings"));
 const HoldingsPage = lazy(() => import("@/pages/holdings"));
+const ReportPage = lazy(() => import("@/pages/report"));
 
 const fallback = (
   <div className="space-y-3">
@@ -35,6 +36,7 @@ export default function App() {
               <Route path="review" element={<ReviewPage />} />
             </Route>
             <Route path="plan" element={<PlanPage />} />
+            <Route path="plan/report" element={<ReportPage />} />
             <Route path="more">
               <Route index element={<MorePage />} />
               <Route path="accounts" element={<AccountsPage />} />

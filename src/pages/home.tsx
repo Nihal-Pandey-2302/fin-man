@@ -5,18 +5,22 @@ import { cn } from "cn";
 import type { Dashboard, Txn } from "@shared/api";
 import { formatPaise } from "@shared/money";
 import { daysBetween, formatShortDate } from "@shared/time";
+import { AlertBanners } from "@/components/alert-banners";
 import { Money } from "@/components/money";
+import { SalaryPlanCard } from "@/components/salary-plan-card";
 import { TxnEditor, type EditorTarget } from "@/components/txn-editor";
 import { TxnRow } from "@/components/txn-row";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { relativeTime } from "@/lib/relative";
-import { useDashboard, useLookups } from "@/lib/queries";
+import { useDashboard, useLookups, useSalaryPlan } from "@/lib/queries";
 
 export default function HomePage() {
   const { data: d, isPending, isError, refetch } = useDashboard();
   const [editing, setEditing] = useState<EditorTarget | null>(null);
+  const { data: plan } = useSalaryPlan();
+  const showPlan = !!d && !!plan && daysBetween(plan.cycleStart, d.today) <= 5 && plan.items.some((i) => !i.done);
 
   if (isError) {
     return (
@@ -55,9 +59,12 @@ export default function HomePage() {
         </Link>
       )}
 
+      {d && <AlertBanners alerts={d.alerts} />}
+
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
           {isPending ? <Skeleton className="h-48 rounded-xl" /> : <SafeToSpend d={d} />}
+          {showPlan && <SalaryPlanCard plan={plan} />}
           {isPending ? <Skeleton className="h-40 rounded-xl" /> : <DailyChart d={d} />}
           {isPending ? <Skeleton className="h-64 rounded-xl" /> : <ByCategory d={d} />}
         </div>
@@ -194,8 +201,13 @@ function ByCategory({ d }: { d: Dashboard }) {
   const max = Math.max(...rows.map((r) => Math.max(r.spentPaise, r.limitPaise ?? 0)), 1);
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Where it went</CardTitle>
+        <Button variant="ghost" size="sm" asChild>
+          <Link to="/plan/report">
+            Report <ArrowRight />
+          </Link>
+        </Button>
       </CardHeader>
       <CardContent className="space-y-3">
         {rows.length === 0 && <p className="text-sm text-muted-foreground">No spending this cycle yet.</p>}

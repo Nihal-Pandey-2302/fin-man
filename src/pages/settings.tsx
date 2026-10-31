@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Check, Copy, Download, Moon, Plus, Sun, SunMoon, Trash2 } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { Bell, BellOff, Check, Copy, Download, Moon, Plus, Sun, SunMoon, Trash2 } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { formatPaise, rupeesToPaise } from "@shared/money";
 import { NativeSelect } from "@/components/native-select";
@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { del, patch, post } from "@/lib/api";
+import { api, del, errorMessage, patch, post } from "@/lib/api";
 import { invalidateLedger, useLookups } from "@/lib/queries";
 import { SubPageHeader } from "./more";
 
@@ -22,6 +22,7 @@ export default function SettingsPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <GeneralCard />
         <SmsSetupCard />
+        <NotificationsCard />
         <PresetsCard />
         <AppearanceCard />
       </div>
@@ -34,6 +35,7 @@ function GeneralCard() {
   const qc = useQueryClient();
   const [names, setNames] = useState((settings?.owner_names ?? []).join(", "));
   const [buffer, setBuffer] = useState(paiseToInput(settings?.liquid_buffer_paise));
+  const [autopayBuffer, setAutopayBuffer] = useState(paiseToInput(settings?.autopay_buffer_paise));
   const [employer, setEmployer] = useState(settings?.salary_employer ?? "");
   const [salaryMin, setSalaryMin] = useState(paiseToInput(settings?.salary_min_paise));
   const submit = async (e: FormEvent) => {
@@ -41,6 +43,7 @@ function GeneralCard() {
     await patch("/settings", {
       owner_names: names.split(",").map((n) => n.trim()).filter((n) => n.length >= 2),
       liquid_buffer_paise: rupeesToPaise(buffer) ?? 0,
+      autopay_buffer_paise: rupeesToPaise(autopayBuffer) ?? 0,
       salary_employer: employer.trim(),
       salary_min_paise: rupeesToPaise(salaryMin) ?? 0,
     });
@@ -70,11 +73,17 @@ function GeneralCard() {
               <RupeeInput id="s-salary" value={salaryMin} onChange={setSalaryMin} />
             </div>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="s-buffer">Liquid buffer</Label>
-            <RupeeInput id="s-buffer" value={buffer} onChange={setBuffer} />
-            <p className="text-xs text-muted-foreground">Money you never want to touch; shown as “free after buffer”.</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="s-buffer">Liquid buffer</Label>
+              <RupeeInput id="s-buffer" value={buffer} onChange={setBuffer} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="s-abuffer">Autopay buffer</Label>
+              <RupeeInput id="s-abuffer" value={autopayBuffer} onChange={setAutopayBuffer} />
+            </div>
           </div>
+          <p className="text-xs text-muted-foreground">Liquid buffer: money you never want to touch (“free after buffer”). Autopay buffer: extra the salary-day plan keeps in the autopay account.</p>
           <Button type="submit">Save</Button>
         </form>
       </CardContent>
@@ -122,6 +131,79 @@ function CopyRow({ label, value, copied, onCopy }: { label: string; value: strin
         </Button>
       </div>
     </div>
+  );
+}
+
+const b64ToBytes = (b64url: string) => {
+  const b64 = (b64url + "=".repeat((4 - (b64url.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/");
+  return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+};
+
+function NotificationsCard() {
+  const supported = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  const [key, setKey] = useState<string | null | undefined>(undefined);
+  const [sub, setSub] = useState<PushSubscription | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!supported) return;
+    api<{ publicKey: string | null }>("/push/key").then((r) => setKey(r.publicKey), () => setKey(null));
+    navigator.serviceWorker.getRegistration().then((reg) => reg?.pushManager.getSubscription().then(setSub));
+  }, [supported]);
+
+  const enable = async () => {
+    setBusy(true);
+    try {
+      if ((await Notification.requestPermission()) !== "granted") throw new Error("Notifications are blocked for this site");
+      const reg = await navigator.serviceWorker.ready;
+      const s = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(key!) });
+      await post("/push/subscribe", s.toJSON());
+      setSub(s);
+      toast.success("Notifications on");
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const disable = async () => {
+    if (!sub) return;
+    await post("/push/unsubscribe", { endpoint: sub.endpoint });
+    await sub.unsubscribe();
+    setSub(null);
+  };
+  const test = async () => {
+    const r = await post<{ sent: number }>("/push/test");
+    toast[r.sent ? "success" : "error"](r.sent ? "Test sent" : "Nothing was delivered");
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Notifications</CardTitle>
+        <CardDescription>A 9 am nudge for card bills, autopays, a missing salary and the review inbox. Install the app to the home screen first on Android.</CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-wrap gap-2">
+        {!supported ? (
+          <p className="text-sm text-muted-foreground">This browser doesn't support push notifications.</p>
+        ) : key === null ? (
+          <p className="text-sm text-muted-foreground">Not configured on the server (VAPID keys missing — run `npm run vapid`).</p>
+        ) : sub ? (
+          <>
+            <Button variant="outline" onClick={test}>
+              <Bell /> Send a test
+            </Button>
+            <Button variant="ghost" onClick={disable}>
+              <BellOff /> Turn off
+            </Button>
+          </>
+        ) : (
+          <Button onClick={enable} disabled={busy || key === undefined}>
+            <Bell /> Turn on notifications
+          </Button>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

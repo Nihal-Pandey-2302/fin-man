@@ -34,11 +34,10 @@ export async function detectSalary(db: Db, txnId: number): Promise<{ cycleId: nu
       inSalaryWindow(istDate(t.occurredAt)) &&
       (!employer || (t.merchant ?? "").toLowerCase().includes(employer));
     if (!auto) return null;
-    const salaryCat = await db.select({ id: categories.id }).from(categories).where(eq(categories.name, "Salary")).get();
-    await db
-      .update(transactions)
-      .set({ incomeSource: "salary", categoryId: salaryCat?.id ?? null, status: "confirmed" })
-      .where(eq(transactions.id, t.id));
+  }
+  if (!explicit || t.categoryId === null || t.status !== "confirmed") {
+    const salaryCat = t.categoryId ?? (await db.select({ id: categories.id }).from(categories).where(eq(categories.name, "Salary")).get())?.id ?? null;
+    await db.update(transactions).set({ incomeSource: "salary", categoryId: salaryCat, status: "confirmed" }).where(eq(transactions.id, t.id));
   }
 
   const linked = await db.select({ id: budgetCycles.id }).from(budgetCycles).where(eq(budgetCycles.salaryTxnId, t.id)).get();
