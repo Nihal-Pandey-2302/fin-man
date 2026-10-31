@@ -34,8 +34,8 @@ Read this first if you're resuming after a context reset. Then read CLAUDE.md an
 - [x] 5. API: accounts (+numbers, balances), categories, rules, transactions, review, dashboard, cycles, autopays, presets, loans, holdings, settings, export, bootstrap (worker/routes/*, tests/api.test.ts)
 - [x] 6. UI: all Phase 1 screens plus Plan (cycle, autopays, loans) and Holdings. Checked in headless Chrome at 390×844 and 1440×900 (script in the session scratchpad; puppeteer-core + /usr/bin/google-chrome).
 - [x] 7. Matcher: transfers / card payments (worker/ledger/matcher.ts; runs on every SMS insert)
-- [ ] 8. PWA (vite-plugin-pwa, icons), route code-splitting
-- [ ] 9. `npm run backup` (wrangler d1 execute → JSON) + /api/export
+- [x] 8. PWA (vite-plugin-pwa, client env only; icons from public/icon.svg; NetworkFirst API cache). Offline reload verified. Routes code-split.
+- [x] 9. `npm run backup` (scripts/backup.mjs; `-- --remote` for prod) + GET /api/export (Settings → Download backup)
 - [ ] 10. Review pass (simplify / code-review), browser check with `run`
 - [ ] Phase 2: salary detection → budget cycles, salary-day plan, autopay calendar + matching + low-balance warning, card reminders, monthly report
 

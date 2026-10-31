@@ -24,6 +24,8 @@ First run: `npm install && cp .dev.vars.example .dev.vars && npm run db:migrate`
 - `npm test` / `npm run test:watch`: Vitest inside workerd (`@cloudflare/vitest-plugin`). Each test file gets a fresh D1 with all migrations applied.
 - `npm run typecheck` · `npm run lint` (oxlint) · `npm run build`
 - `npm run db:generate`: drizzle-kit turns `worker/db/schema.ts` into SQL in `migrations/`. `npm run db:migrate` applies it to the **local** D1.
+- `npm run backup`: dumps every table to `backups/fintrack-local-<time>.json` (gitignored). Add `-- --remote` to dump the deployed D1 instead, using your wrangler login.
+- `npm run pwa-assets`: regenerate PWA icons from `public/icon.svg`.
 - `npm run cf-typegen`: regenerate `worker-configuration.d.ts` after editing `wrangler.jsonc` or `.dev.vars`.
 - There is intentionally no `deploy` script yet (see Guardrails).
 

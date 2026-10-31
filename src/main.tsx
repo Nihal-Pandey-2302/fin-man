@@ -4,8 +4,12 @@ import { createRoot } from "react-dom/client";
 import { ThemeProvider } from "@/components/theme";
 import { Toaster } from "@/components/ui/sonner";
 import { queryClient } from "@/lib/queries";
+import { registerSW } from "virtual:pwa-register";
 import "./index.css";
 import App from "./App";
+
+// Installable PWA: new versions activate on the next launch without prompting.
+registerSW({ immediate: true });
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

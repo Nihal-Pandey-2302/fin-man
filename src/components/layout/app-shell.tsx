@@ -1,6 +1,6 @@
 import { Plus, Wallet } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
-import { NavLink, Outlet, useLocation } from "react-router";
+import { NavLink, Outlet, useLocation, useNavigate, useSearchParams } from "react-router";
 import { cn } from "cn";
 import { QuickAddDrawer } from "@/components/quick-add-drawer";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,16 @@ export function AppShell() {
   const { data } = useBootstrap();
   const review = data?.reviewCount ?? 0;
   const { pathname } = useLocation();
+  const [params] = useSearchParams();
+  const navigate = useNavigate();
+
+  // Home-screen shortcut "Quick add" opens /?add=1.
+  useEffect(() => {
+    if (params.get("add") === "1") {
+      setQuickAddOpen(true);
+      navigate(pathname, { replace: true });
+    }
+  }, [params, pathname, navigate]);
 
   // Braced body: Chrome's scrollTo now returns a Promise, which React would treat as a cleanup.
   useEffect(() => {
