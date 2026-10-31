@@ -3,13 +3,13 @@ import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { getDb, schema } from "../worker/db";
 
-const { accounts, categories, smsRaw, transactions } = schema;
+const { accountNumbers, accounts, categories, merchantRules, smsRaw, transactions } = schema;
 const db = getDb(env.DB);
 
 async function makeAccount() {
   const [a] = await db
     .insert(accounts)
-    .values({ name: "IDFC", institution: "IDFC", kind: "bank", role: "spending", last4: "1234" })
+    .values({ name: "IDFC", institution: "IDFC", kind: "bank", role: "spending" })
     .returning();
   return a;
 }
@@ -38,6 +38,7 @@ describe("schema", () => {
     // Per-file storage is shared across tests in a file; start each test clean.
     await db.delete(transactions);
     await db.delete(smsRaw);
+    await db.delete(accountNumbers);
     await db.delete(accounts);
   });
 
@@ -105,10 +106,19 @@ describe("schema", () => {
     await expectConstraint(db.delete(accounts).where(eq(accounts.id, a.id)), /FOREIGN KEY/i);
   });
 
-  it("validates last4 format", async () => {
-    await expectConstraint(
-      db.insert(accounts).values({ name: "x", institution: "HDFC", kind: "bank", last4: "12a4" }),
-      /CHECK/i,
-    );
+  it("validates last4 format and allows several numbers per account", async () => {
+    const a = await makeAccount();
+    await db.insert(accountNumbers).values([
+      { accountId: a.id, last4: "1111", label: "RuPay" },
+      { accountId: a.id, last4: "2222", label: "Mastercard" },
+    ]);
+    await expectConstraint(db.insert(accountNumbers).values({ accountId: a.id, last4: "12a4" }), /CHECK/i);
+    await expectConstraint(db.insert(accountNumbers).values({ accountId: a.id, last4: "1111" }), /UNIQUE/i);
+  });
+
+  it("seeds starter merchant rules linked to categories", async () => {
+    const rules = await db.select().from(merchantRules);
+    expect(rules.find((r) => r.match === "swiggy")?.categoryId).toBeTruthy();
+    expect(rules.find((r) => r.match === "groww")?.kindOverride).toBe("investment");
   });
 });

@@ -33,6 +33,7 @@ export const TXN_KINDS = [
   "interest",
   "investment",
 ] as const;
+export const CHANNELS = ["upi", "card", "imps", "neft", "rtgs", "atm", "nach", "cash", "other"] as const;
 export const TXN_SOURCES = ["sms", "manual", "import"] as const;
 export const TXN_STATUSES = ["needs_review", "confirmed"] as const;
 export const INCOME_SOURCES = ["salary", "freelance", "hackathon", "bounty", "misc", "other"] as const;
@@ -71,7 +72,6 @@ export const accounts = sqliteTable(
     institution: text({ enum: INSTITUTIONS }).notNull(),
     kind: text({ enum: ACCOUNT_KINDS }).notNull(),
     role: text({ enum: ACCOUNT_ROLES }).notNull().default("other"),
-    last4: text(),
     // Balance = opening balance + every transaction after `openingBalanceAt`.
     // For a credit card this is the outstanding amount (positive = owed).
     openingBalancePaise: integer().notNull().default(0),
@@ -88,11 +88,30 @@ export const accounts = sqliteTable(
     enumCheck("institution", INSTITUTIONS),
     enumCheck("kind", ACCOUNT_KINDS),
     enumCheck("role", ACCOUNT_ROLES),
-    check("last4_format", sql`${t.last4} is null or (length(${t.last4}) = 4 and ${t.last4} not glob '*[^0-9]*')`),
     check("statement_day_range", sql`${t.statementDay} is null or ${t.statementDay} between 1 and 31`),
     check("due_day_range", sql`${t.dueDay} is null or ${t.dueDay} between 1 and 31`),
-    // SMS parsers resolve the account by institution + last4.
-    uniqueIndex("accounts_institution_last4_uq").on(t.institution, t.last4),
+  ],
+);
+
+/**
+ * Card/account numbers (last 4 digits) that SMS can mention. One account may have several:
+ * e.g. one credit card with a RuPay number (UPI) and a Mastercard number sharing a limit.
+ * SMS parsers resolve the account by institution + account kind + last4.
+ */
+export const accountNumbers = sqliteTable(
+  "account_numbers",
+  {
+    id: id(),
+    accountId: integer()
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    last4: text().notNull(),
+    label: text(),
+  },
+  (t) => [
+    check("last4_format", sql`length(${t.last4}) = 4 and ${t.last4} not glob '*[^0-9]*'`),
+    uniqueIndex("account_numbers_account_last4_uq").on(t.accountId, t.last4),
+    index("account_numbers_last4_idx").on(t.last4),
   ],
 );
 
@@ -125,6 +144,8 @@ export const smsRaw = sqliteTable(
     hash: text().notNull(),
     parseStatus: text({ enum: PARSE_STATUSES }).notNull(),
     parser: text(),
+    /** Parser output as JSON (also holds notices like upcoming-autopay alerts). */
+    parsedJson: text(),
     error: text(),
     createdAt: createdAt(),
   },
@@ -174,6 +195,9 @@ export const transactions = sqliteTable(
     counterpartyVpa: text(),
     refNo: text(),
     balanceAfterPaise: integer(),
+    /** Credit cards: available limit reported by the SMS (outstanding = limit − available). */
+    availableLimitPaise: integer(),
+    channel: text({ enum: CHANNELS }),
     source: text({ enum: TXN_SOURCES }).notNull(),
     smsId: integer().references(() => smsRaw.id, { onDelete: "set null" }),
     /** Shared by both legs of a transfer or card payment. */
@@ -192,6 +216,7 @@ export const transactions = sqliteTable(
     enumCheck("source", TXN_SOURCES),
     enumCheck("status", TXN_STATUSES),
     enumCheck("income_source", INCOME_SOURCES, true),
+    enumCheck("channel", CHANNELS, true),
     check("income_source_only_on_income", sql`${t.incomeSource} is null or ${t.kind} = 'income'`),
     // One SMS → at most one transaction (NULLs are allowed many times in SQLite).
     uniqueIndex("transactions_sms_id_uq").on(t.smsId),

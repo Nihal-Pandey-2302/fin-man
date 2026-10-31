@@ -1,9 +1,82 @@
 {
-  "id": "949322f4-faed-4848-a381-436a4ddfefc5",
-  "prevId": "d68509e3-178a-46a5-a51f-cd95ccd4e61c",
+  "id": "05a4a5dd-fee9-437c-bb91-d670f731ee3d",
+  "prevId": "22fcbcf3-2db9-4f59-9e70-0869065205c9",
   "version": "6",
   "dialect": "sqlite",
   "tables": {
+    "account_numbers": {
+      "name": "account_numbers",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last4": {
+          "name": "last4",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "account_numbers_account_last4_uq": {
+          "name": "account_numbers_account_last4_uq",
+          "columns": [
+            "account_id",
+            "last4"
+          ],
+          "isUnique": true
+        },
+        "account_numbers_last4_idx": {
+          "name": "account_numbers_last4_idx",
+          "columns": [
+            "last4"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "account_numbers_account_id_accounts_id_fk": {
+          "name": "account_numbers_account_id_accounts_id_fk",
+          "tableFrom": "account_numbers",
+          "columnsFrom": [
+            "account_id"
+          ],
+          "tableTo": "accounts",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "cascade"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "last4_format": {
+          "name": "last4_format",
+          "value": "length(\"account_numbers\".\"last4\") = 4 and \"account_numbers\".\"last4\" not glob '*[^0-9]*'"
+        }
+      }
+    },
     "accounts": {
       "name": "accounts",
       "columns": {
@@ -42,13 +115,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'other'"
-        },
-        "last4": {
-          "name": "last4",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         },
         "opening_balance_paise": {
           "name": "opening_balance_paise",
@@ -118,16 +184,7 @@
           "default": "(unixepoch('subsec') * 1000)"
         }
       },
-      "indexes": {
-        "accounts_institution_last4_uq": {
-          "name": "accounts_institution_last4_uq",
-          "columns": [
-            "institution",
-            "last4"
-          ],
-          "isUnique": true
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -143,10 +200,6 @@
         "role_enum": {
           "name": "role_enum",
           "value": "role in ('salary', 'spending', 'autopay', 'card', 'other')"
-        },
-        "last4_format": {
-          "name": "last4_format",
-          "value": "\"accounts\".\"last4\" is null or (length(\"accounts\".\"last4\") = 4 and \"accounts\".\"last4\" not glob '*[^0-9]*')"
         },
         "statement_day_range": {
           "name": "statement_day_range",
@@ -1137,6 +1190,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "parsed_json": {
+          "name": "parsed_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "error": {
           "name": "error",
           "type": "text",
@@ -1256,6 +1316,20 @@
         "balance_after_paise": {
           "name": "balance_after_paise",
           "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "available_limit_paise": {
+          "name": "available_limit_paise",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "channel": {
+          "name": "channel",
+          "type": "text",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
@@ -1479,6 +1553,10 @@
         "income_source_enum": {
           "name": "income_source_enum",
           "value": "income_source is null or income_source in ('salary', 'freelance', 'hackathon', 'bounty', 'misc', 'other')"
+        },
+        "channel_enum": {
+          "name": "channel_enum",
+          "value": "channel is null or channel in ('upi', 'card', 'imps', 'neft', 'rtgs', 'atm', 'nach', 'cash', 'other')"
         },
         "income_source_only_on_income": {
           "name": "income_source_only_on_income",

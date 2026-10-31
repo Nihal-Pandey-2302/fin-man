@@ -1,10 +1,20 @@
+CREATE TABLE `account_numbers` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`account_id` integer NOT NULL,
+	`last4` text NOT NULL,
+	`label` text,
+	FOREIGN KEY (`account_id`) REFERENCES `accounts`(`id`) ON UPDATE no action ON DELETE cascade,
+	CONSTRAINT "last4_format" CHECK(length("account_numbers"."last4") = 4 and "account_numbers"."last4" not glob '*[^0-9]*')
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `account_numbers_account_last4_uq` ON `account_numbers` (`account_id`,`last4`);--> statement-breakpoint
+CREATE INDEX `account_numbers_last4_idx` ON `account_numbers` (`last4`);--> statement-breakpoint
 CREATE TABLE `accounts` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`name` text NOT NULL,
 	`institution` text NOT NULL,
 	`kind` text NOT NULL,
 	`role` text DEFAULT 'other' NOT NULL,
-	`last4` text,
 	`opening_balance_paise` integer DEFAULT 0 NOT NULL,
 	`opening_balance_at` integer,
 	`credit_limit_paise` integer,
@@ -17,12 +27,10 @@ CREATE TABLE `accounts` (
 	CONSTRAINT "institution_enum" CHECK(institution in ('HDFC', 'IDFC', 'INDIAN', 'CARD', 'CASH', 'OTHER')),
 	CONSTRAINT "kind_enum" CHECK(kind in ('bank', 'credit_card', 'cash', 'wallet')),
 	CONSTRAINT "role_enum" CHECK(role in ('salary', 'spending', 'autopay', 'card', 'other')),
-	CONSTRAINT "last4_format" CHECK("accounts"."last4" is null or (length("accounts"."last4") = 4 and "accounts"."last4" not glob '*[^0-9]*')),
 	CONSTRAINT "statement_day_range" CHECK("accounts"."statement_day" is null or "accounts"."statement_day" between 1 and 31),
 	CONSTRAINT "due_day_range" CHECK("accounts"."due_day" is null or "accounts"."due_day" between 1 and 31)
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `accounts_institution_last4_uq` ON `accounts` (`institution`,`last4`);--> statement-breakpoint
 CREATE TABLE `autopays` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`name` text NOT NULL,
@@ -169,6 +177,7 @@ CREATE TABLE `sms_raw` (
 	`hash` text NOT NULL,
 	`parse_status` text NOT NULL,
 	`parser` text,
+	`parsed_json` text,
 	`error` text,
 	`created_at` integer DEFAULT (unixepoch('subsec') * 1000) NOT NULL,
 	CONSTRAINT "parse_status_enum" CHECK(parse_status in ('parsed', 'unparsed', 'ignored', 'error'))
@@ -188,6 +197,8 @@ CREATE TABLE `transactions` (
 	`counterparty_vpa` text,
 	`ref_no` text,
 	`balance_after_paise` integer,
+	`available_limit_paise` integer,
+	`channel` text,
 	`source` text NOT NULL,
 	`sms_id` integer,
 	`transfer_group_id` text,
@@ -207,6 +218,7 @@ CREATE TABLE `transactions` (
 	CONSTRAINT "source_enum" CHECK(source in ('sms', 'manual', 'import')),
 	CONSTRAINT "status_enum" CHECK(status in ('needs_review', 'confirmed')),
 	CONSTRAINT "income_source_enum" CHECK(income_source is null or income_source in ('salary', 'freelance', 'hackathon', 'bounty', 'misc', 'other')),
+	CONSTRAINT "channel_enum" CHECK(channel is null or channel in ('upi', 'card', 'imps', 'neft', 'rtgs', 'atm', 'nach', 'cash', 'other')),
 	CONSTRAINT "income_source_only_on_income" CHECK("transactions"."income_source" is null or "transactions"."kind" = 'income')
 );
 --> statement-breakpoint
