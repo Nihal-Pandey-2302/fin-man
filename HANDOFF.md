@@ -32,7 +32,7 @@ Read this first if you're resuming after a context reset. Then read CLAUDE.md an
 - [x] 3. Schema + migrations (256053f, then regenerated tonight)
 - [x] 4. SMS ingest endpoint + parser framework + bank parsers + fixture tests (worker/sms/*, tests/parsers|ingest.test.ts)
 - [x] 5. API: accounts (+numbers, balances), categories, rules, transactions, review, dashboard, cycles, autopays, presets, loans, holdings, settings, export, bootstrap (worker/routes/*, tests/api.test.ts)
-- [ ] 6. UI: providers (react-query, theme, toasts), accounts setup, review inbox (swipe), quick add (keypad, 3 taps), dashboard, transactions list/edit, categories & rules, settings
+- [x] 6. UI: all Phase 1 screens plus Plan (cycle, autopays, loans) and Holdings. Checked in headless Chrome at 390×844 and 1440×900 (script in the session scratchpad; puppeteer-core + /usr/bin/google-chrome).
 - [x] 7. Matcher: transfers / card payments (worker/ledger/matcher.ts; runs on every SMS insert)
 - [ ] 8. PWA (vite-plugin-pwa, icons), route code-splitting
 - [ ] 9. `npm run backup` (wrangler d1 execute → JSON) + /api/export
@@ -45,6 +45,12 @@ Read this first if you're resuming after a context reset. Then read CLAUDE.md an
 - A cycle is the latest budget_cycles row with start ≤ today; an open one ends start+1 month−1. With no cycle, the calendar month with budget 0 is used.
 - Balances: anchored on the newer of the latest SMS balance/available limit and the opening/manual correction (POST /accounts/:id/balance).
 - GitHub push needs the noreply email: repo-local user.email = 127308117+Nihal-Pandey-2302@users.noreply.github.com (already set).
+
+## UI notes / gotchas
+- Chrome's `window.scrollTo` now returns a Promise, so never write `useEffect(() => window.scrollTo(...))` with an expression body: React treats the Promise as a cleanup and crashes ("destroy is not a function").
+- next-themes was removed (React 19 warns about its injected <script>). The theme lives in src/components/theme.tsx, and an inline script in index.html applies it before first paint.
+- shadcn now imports `cn` from the `cn` npm package. That is correct.
+- Quick add must fit on a 390×844 screen without scrolling (keypad h-12, tiles min-h-14).
 
 ## Where things are
 - Worker: `worker/index.ts` (Hono, basePath /api) · `worker/db/{schema,index}.ts` · `worker/sms/*` (ingest pipeline + parsers) · `worker/routes/*`

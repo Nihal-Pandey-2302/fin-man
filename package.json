@@ -24,7 +24,6 @@
     "drizzle-orm": "^0.45.4",
     "hono": "^4.13.14",
     "lucide-react": "^1.66.0",
-    "next-themes": "^0.4.6",
     "radix-ui": "^1.8.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

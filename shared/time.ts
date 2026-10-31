@@ -83,3 +83,16 @@ export function formatDay(at: Date | number | string, today = istDate()): string
 export function formatShortDate(date: string): string {
   return dayMonth.format(istDayStart(date).getTime() + 12 * 3_600_000);
 }
+
+/** Instant → "YYYY-MM-DDTHH:mm" in IST, for <input type="datetime-local"> (whatever the device timezone). */
+export function toIstInput(at: Date | number | string): string {
+  return new Date(+new Date(at) + IST_OFFSET_MS).toISOString().slice(0, 16);
+}
+
+/** "YYYY-MM-DDTHH:mm" read as IST wall-clock time → ISO instant. */
+export function fromIstInput(value: string): string {
+  const [d, t = "00:00"] = value.split("T");
+  const { y, m, d: day } = parseDate(d);
+  const [h, min] = t.split(":").map(Number);
+  return istToUtc(y, m, day, h, min).toISOString();
+}

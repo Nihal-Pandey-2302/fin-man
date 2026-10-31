@@ -1,13 +1,23 @@
 import { Plus, Wallet } from "lucide-react";
-import { useEffect, useState } from "react";
-import { NavLink, Outlet } from "react-router";
+import { Suspense, useEffect, useState } from "react";
+import { NavLink, Outlet, useLocation } from "react-router";
 import { cn } from "cn";
-import { Button } from "@/components/ui/button";
 import { QuickAddDrawer } from "@/components/quick-add-drawer";
-import { NAV_ITEMS, type NavItem } from "./nav-items";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useBootstrap } from "@/lib/queries";
+import { NAV_ITEMS, SIDEBAR_EXTRA, type NavItem } from "./nav-items";
 
 export function AppShell() {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const { data } = useBootstrap();
+  const review = data?.reviewCount ?? 0;
+  const { pathname } = useLocation();
+
+  // Braced body: Chrome's scrollTo now returns a Promise, which React would treat as a cleanup.
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [pathname]);
 
   // Laptop shortcut: `n` opens quick add (ignored while typing in a field).
   useEffect(() => {
@@ -33,19 +43,25 @@ export function AppShell() {
           <Plus /> Quick add
           <kbd className="ml-auto rounded border border-primary-foreground/30 px-1.5 text-xs">N</kbd>
         </Button>
-        {NAV_ITEMS.map((item) => (
+        {NAV_ITEMS.slice(0, 3).map((item) => (
+          <SidebarLink key={item.to} {...item} badge={item.to === "/activity" ? review : 0} />
+        ))}
+        <div className="mt-4 mb-1 px-3 text-xs font-medium text-muted-foreground">Manage</div>
+        {SIDEBAR_EXTRA.map((item) => (
           <SidebarLink key={item.to} {...item} />
         ))}
       </aside>
 
       <main className="mx-auto w-full max-w-6xl px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-28 lg:px-8 lg:py-8">
-        <Outlet />
+        <Suspense fallback={<Skeleton className="h-64 rounded-xl" />}>
+          <Outlet />
+        </Suspense>
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/90 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden">
         <div className="mx-auto grid h-16 max-w-md grid-cols-5 items-center">
           <TabLink {...NAV_ITEMS[0]} />
-          <TabLink {...NAV_ITEMS[1]} />
+          <TabLink {...NAV_ITEMS[1]} badge={review} />
           <div className="flex justify-center">
             <Button
               size="icon"
@@ -66,7 +82,7 @@ export function AppShell() {
   );
 }
 
-function SidebarLink({ to, label, icon: Icon }: NavItem) {
+function SidebarLink({ to, label, icon: Icon, badge = 0 }: NavItem & { badge?: number }) {
   return (
     <NavLink
       to={to}
@@ -79,23 +95,28 @@ function SidebarLink({ to, label, icon: Icon }: NavItem) {
       }
     >
       <Icon className="size-4" /> {label}
+      {badge > 0 && <span className="ml-auto rounded-full bg-amber-500 px-1.5 text-xs font-medium text-black tabular-nums">{badge}</span>}
     </NavLink>
   );
 }
 
-function TabLink({ to, label, icon: Icon }: NavItem) {
+function TabLink({ to, label, icon: Icon, badge = 0 }: NavItem & { badge?: number }) {
   return (
     <NavLink
       to={to}
       end={to === "/"}
       className={({ isActive }) =>
-        cn(
-          "flex h-full flex-col items-center justify-center gap-1 text-[11px] text-muted-foreground",
-          isActive && "text-foreground",
-        )
+        cn("relative flex h-full flex-col items-center justify-center gap-1 text-[11px] text-muted-foreground", isActive && "text-foreground")
       }
     >
-      <Icon className="size-5" />
+      <span className="relative">
+        <Icon className="size-5" />
+        {badge > 0 && (
+          <span className="absolute -top-1.5 -right-2.5 min-w-4 rounded-full bg-amber-500 px-1 text-center text-[10px] leading-4 font-semibold text-black tabular-nums">
+            {badge > 99 ? "99+" : badge}
+          </span>
+        )}
+      </span>
       {label}
     </NavLink>
   );
