@@ -9,19 +9,16 @@ import { useBootstrap } from "@/lib/queries";
 import { NAV_ITEMS, SIDEBAR_EXTRA, type NavItem } from "./nav-items";
 
 export function AppShell() {
-  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  // Home-screen shortcut "Quick add" launches /?add=1.
+  const [quickAddOpen, setQuickAddOpen] = useState(() => new URLSearchParams(window.location.search).get("add") === "1");
   const { data } = useBootstrap();
   const review = data?.reviewCount ?? 0;
   const { pathname } = useLocation();
   const [params] = useSearchParams();
   const navigate = useNavigate();
 
-  // Home-screen shortcut "Quick add" opens /?add=1.
   useEffect(() => {
-    if (params.get("add") === "1") {
-      setQuickAddOpen(true);
-      navigate(pathname, { replace: true });
-    }
+    if (params.has("add")) navigate(pathname, { replace: true });
   }, [params, pathname, navigate]);
 
   // Braced body: Chrome's scrollTo now returns a Promise, which React would treat as a cleanup.
