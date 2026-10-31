@@ -36,8 +36,17 @@ Read this first if you're resuming after a context reset. Then read CLAUDE.md an
 - [x] 7. Matcher: transfers / card payments (worker/ledger/matcher.ts; runs on every SMS insert)
 - [x] 8. PWA (vite-plugin-pwa, client env only; icons from public/icon.svg; NetworkFirst API cache). Offline reload verified. Routes code-split.
 - [x] 9. `npm run backup` (scripts/backup.mjs; `-- --remote` for prod) + GET /api/export (Settings → Download backup)
-- [ ] 10. Review pass (simplify / code-review), browser check with `run`
-- [ ] Phase 2: salary detection → budget cycles, salary-day plan, autopay calendar + matching + low-balance warning, card reminders, monthly report
+- [x] 10. Review pass: code-review (medium) found 10 issues, all fixed with regression tests (tests/regressions.test.ts). Browser-checked.
+- [ ] **Phase 2** (in progress), in this order:
+  - [ ] a. Migration 0003 (append-only from now on): `transactions.autopay_id` FK and a `push_subscriptions` table. New setting `autopay_buffer_paise`.
+  - [ ] b. worker/ledger/salary.ts `detectSalary(txnId)`. It qualifies a credit to the account with role=salary when it is explicitly incomeSource=salary, or when kind=income, amount ≥ salary_min_paise, the merchant contains salary_employer, and the IST day falls in the 28th–7th window. It then starts a cycle via `startCycle`, carrying the previous plannedSpend forward. If the latest cycle has no salaryTxnId and started ≤7 days before, that cycle is re-anchored instead. Hooked into ingest, POST /transactions and PATCH.
+  - [ ] c. worker/ledger/autopays.ts. Matching: a debit on the same account, amount within ±1% (or matchHint/name found in the merchant), due within ±4 days, sets autopay_id, category, kind (sip→investment) and confirmed, then calls advanceAutopay. The Indian Bank "will be debited" notice updates the matching autopay's nextDueOn. A calendar endpoint lists occurrences in the cycle as paid/due/overdue.
+  - [ ] d. worker/ledger/alerts.ts: salary missing (day ≥ 5 with no salary since the 28th), card due ≤ 3 days with outstanding > 0, autopay account short of the autopays still due, autopays due tomorrow. Exposed on /dashboard as `alerts`.
+  - [ ] e. GET /api/salary-plan: card bill (card outstanding) from salary→card; top-up spending = plannedSpend − autopays due − spending balance; top-up autopay = autopays due on the autopay account + autopay buffer − its balance; keep = the rest. An item is done when a transfer/card_payment from→to totalling ≥95% of it exists since cycle start.
+  - [ ] f. GET /api/report?start=YYYY-MM-DD: cycle totals (spend, income, invested), by category vs the previous cycle, top merchants, biggest spends.
+  - [ ] g. Web push: VAPID keys in .dev.vars (`npm run vapid`), POST /api/push/subscribe, sending via a vetted lib if it runs on Workers (else WebCrypto), a daily cron `scheduled` 03:30 UTC (09:00 IST) that sends the alerts, and a service-worker push handler via workbox importScripts (public/push-sw.js).
+  - [ ] h. UI: Home alert banners, a salary-plan card (Home when a cycle started ≤5 days ago, plus Plan), the autopay calendar in Plan, a Report page (/plan/report), and a notifications toggle in Settings.
+  - [ ] i. Tests, code-review pass, browser check, then update CLAUDE.md, HANDOFF.md and PLAN.md.
 
 ## API notes
 - Spending = expense + fee debits − refund credits. Transfers, card_payment, income and investment never count, and SIP autopays are excluded from "autopays still due".
