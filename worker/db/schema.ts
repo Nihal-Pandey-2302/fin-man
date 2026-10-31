@@ -153,6 +153,7 @@ export const smsRaw = sqliteTable(
     enumCheck("parse_status", PARSE_STATUSES),
     uniqueIndex("sms_raw_hash_uq").on(t.hash),
     index("sms_raw_status_received_idx").on(t.parseStatus, t.receivedAt),
+    index("sms_raw_received_idx").on(t.receivedAt),
   ],
 );
 

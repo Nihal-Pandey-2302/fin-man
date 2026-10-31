@@ -144,5 +144,7 @@ export type Dashboard = {
   upcomingAutopays: (Autopay & { dueOn: string })[];
   recent: Txn[];
   reviewCount: number;
+  /** Newest SMS received from the phone (ISO), null before the first one. */
+  lastSmsAt: string | null;
   alerts: Alert[];
 };

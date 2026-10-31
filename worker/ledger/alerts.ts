@@ -1,4 +1,4 @@
-import { and, desc, eq, gte } from "drizzle-orm";
+import { and, desc, eq, gte, max } from "drizzle-orm";
 import type { AccountBalance, Alert } from "../../shared/api";
 import { formatPaise } from "../../shared/money";
 import { addDays, addMonths, daysBetween, formatShortDate, istDate, istDayStart, parseDate } from "../../shared/time";
@@ -10,22 +10,40 @@ import { computeBalances } from "./balances";
 import { currentCycle, type CurrentCycle } from "./cycles";
 import { getSettings } from "./settings";
 
+/** Days without any SMS reaching the server before we suspect forwarding on the phone has stopped. */
+export const SMS_STALE_DAYS = 3;
+
+/** When the newest SMS we hold was received (any status: OTP markers prove forwarding works too). */
+export async function lastSmsAt(db: Db): Promise<Date | null> {
+  const row = await db.select({ at: max(smsRaw.receivedAt) }).from(smsRaw).get();
+  return row?.at ?? null;
+}
+
 const inDays = (n: number) => (n === 0 ? "today" : n === 1 ? "tomorrow" : `in ${n} days`);
 
 /**
  * Things worth the owner's attention today (dashboard banners and the daily push):
  * salary not in yet, card bill due soon, autopay account short of what's due, autopays due tomorrow,
- * and bank autopay heads-ups for mandates that aren't tracked.
+ * bank autopay heads-ups for mandates that aren't tracked, and SMS forwarding gone quiet.
  */
-type Precomputed = { accountRows: (typeof accounts.$inferSelect)[]; balances: Map<number, AccountBalance>; cycle: CurrentCycle };
+type Precomputed = { accountRows: (typeof accounts.$inferSelect)[]; balances: Map<number, AccountBalance>; cycle: CurrentCycle; lastSms: Date | null };
 
 export async function buildAlerts(db: Db, today = istDate(), pre?: Precomputed): Promise<Alert[]> {
   const alerts: Alert[] = [];
-  const [accountRows, settings, cycle] = await Promise.all([
+  const [accountRows, settings, cycle, lastSms] = await Promise.all([
     pre?.accountRows ?? db.select().from(accounts).where(eq(accounts.archived, false)).all(),
     getSettings(db),
     pre?.cycle ?? currentCycle(db, today),
+    pre ? pre.lastSms : lastSmsAt(db),
   ]);
+
+  // Forwarding gone quiet: banks text several times a week, so days of silence usually means the phone side stopped.
+  if (lastSms) {
+    const quiet = daysBetween(istDate(lastSms), today);
+    if (quiet >= SMS_STALE_DAYS) {
+      alerts.push({ key: `sms_stale:${istDate(lastSms)}`, level: "warn", title: `No bank SMS for ${quiet} days`, body: "Check that MacroDroid is still running and battery optimisation is off for it.", href: "/more/settings" });
+    }
+  }
   const balances = pre?.balances ?? (await computeBalances(db, accountRows, today));
 
   // Salary missing: from the 5th, if no salary since the 28th of last month.

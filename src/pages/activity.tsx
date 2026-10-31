@@ -21,9 +21,10 @@ import { useBootstrap, useLookups, useTransactions, type TxnFilters } from "@/li
 export function ActivityLayout() {
   const { data } = useBootstrap();
   const tab = ({ isActive }: { isActive: boolean }) =>
-    cn("flex h-9 items-center gap-2 rounded-md px-4 text-sm font-medium transition-colors", isActive ? "bg-background shadow-sm" : "text-muted-foreground");
+    cn("flex h-9 items-center gap-2 rounded-md px-4 text-sm font-medium transition-colors", isActive ? "bg-card shadow-sm" : "text-muted-foreground");
   return (
-    <div className="space-y-4">
+    // A list reads best at a comfortable width; no point stretching rows across a wide screen.
+    <div className="mx-auto max-w-3xl space-y-4">
       <header className="flex items-center justify-between gap-3">
         <h1 className="font-heading text-2xl font-semibold">Activity</h1>
         <nav className="flex rounded-lg bg-muted p-1">

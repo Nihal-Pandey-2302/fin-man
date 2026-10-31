@@ -35,7 +35,7 @@ export default function PlanPage() {
           </Link>
         </Button>
       </header>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <CycleCard />
         {plan && <SalaryPlanCard plan={plan} />}
         <AutopaysCard />
@@ -226,7 +226,7 @@ function AutopaysCard() {
         {!!data?.length && (
           <div className="mb-2 grid w-fit grid-cols-2 gap-1 rounded-lg bg-muted p-1 text-sm">
             {(["calendar", "list"] as const).map((v) => (
-              <button key={v} type="button" onClick={() => setView(v)} className={cn("h-8 rounded-md px-3", view === v ? "bg-background font-medium shadow-sm" : "text-muted-foreground")}>
+              <button key={v} type="button" onClick={() => setView(v)} className={cn("h-8 rounded-md px-3", view === v ? "bg-card font-medium shadow-sm" : "text-muted-foreground")}>
                 {v === "calendar" ? "This cycle" : "All"}
               </button>
             ))}
@@ -235,27 +235,31 @@ function AutopaysCard() {
         {isPending && <Skeleton className="h-24" />}
         {data?.length === 0 && <p className="text-sm text-muted-foreground">Add the debits that hit your autopay account so they're kept out of safe-to-spend.</p>}
         {view === "calendar" && !!data?.length && <AutopayCalendar onOpen={(id) => setEditing(data.find((a) => a.id === id) ?? null)} />}
-        {view === "list" && data?.map((a) => (
-          <button
-            key={a.id}
-            type="button"
-            onClick={() => setEditing(a)}
-            className={cn("flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left hover:bg-muted/60", !a.active && "opacity-50")}
-          >
-            <span className="w-14 shrink-0 text-center">
-              <span className="block text-lg leading-none font-semibold tabular-nums">{a.dayOfMonth}</span>
-              <span className="text-[10px] text-muted-foreground">{FREQ_SHORT[a.frequency]}</span>
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate font-medium">{a.name}</span>
-              <span className="block truncate text-xs text-muted-foreground">
-                {AUTOPAY_KIND_LABEL[a.kind]} · {account(a.accountId)?.name} · next {formatShortDate(a.nextDueOn)}
-                {a.nextDueOn < today && a.active && " (overdue?)"}
-              </span>
-            </span>
-            <Money paise={a.amountPaise} className="font-medium" />
-          </button>
-        ))}
+        {view === "list" && !!data?.length && (
+          <div className="-mx-2">
+            {data.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => setEditing(a)}
+                className={cn("flex w-full items-center gap-3 rounded-lg px-2 py-2.5 text-left hover:bg-muted/60", !a.active && "opacity-50")}
+              >
+                <span className="w-14 shrink-0 text-center">
+                  <span className="block text-lg leading-none font-semibold tabular-nums">{a.dayOfMonth}</span>
+                  <span className="text-[10px] text-muted-foreground">{FREQ_SHORT[a.frequency]}</span>
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">{a.name}</span>
+                  <span className="block truncate text-xs text-muted-foreground">
+                    {AUTOPAY_KIND_LABEL[a.kind]} · {account(a.accountId)?.name} · next {formatShortDate(a.nextDueOn)}
+                    {a.nextDueOn < today && a.active && " (overdue?)"}
+                  </span>
+                </span>
+                <Money paise={a.amountPaise} className="font-medium" />
+              </button>
+            ))}
+          </div>
+        )}
       </CardContent>
       <ResponsiveSheet open={editing !== null} onOpenChange={(o) => !o && setEditing(null)} title={editing === "new" ? "New autopay" : "Edit autopay"}>
         {editing !== null && (
@@ -352,7 +356,7 @@ function AutopayForm({ initial, onDone }: { initial: Autopay | null; onDone: () 
           </NativeSelect>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="a-next">Next due</Label>
+          <Label htmlFor="a-next">Next due {!initial && <span className="font-normal text-muted-foreground">(auto)</span>}</Label>
           <Input id="a-next" type="date" value={nextDueOn} onChange={(e) => setNextDueOn(e.target.value)} className="h-11 md:h-9" />
         </div>
       </div>
@@ -424,7 +428,7 @@ function AutopayCalendar({ onOpen }: { onOpen: (autopayId: number) => void }) {
   if (!data?.length) return <p className="text-sm text-muted-foreground">Nothing scheduled this cycle.</p>;
   const left = data.filter((o) => o.status !== "paid").reduce((s, o) => s + o.amountPaise, 0);
   return (
-    <div className="space-y-1">
+    <div className="-mx-2 space-y-1">
       {data.map((o) => (
         <button key={`${o.autopayId}-${o.dueOn}`} type="button" onClick={() => onOpen(o.autopayId)} className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left hover:bg-muted/60">
           <span className="w-14 shrink-0 text-sm text-muted-foreground tabular-nums">{formatShortDate(o.dueOn)}</span>
@@ -432,10 +436,12 @@ function AutopayCalendar({ onOpen }: { onOpen: (autopayId: number) => void }) {
             <span className="block truncate font-medium">{o.name}</span>
             <span className="block truncate text-xs text-muted-foreground">{account(o.accountId)?.name}</span>
           </span>
-          <span className={cn("flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium", STATUS_STYLE[o.status])}>
-            {o.status === "paid" && <Check className="size-3" />}
-            {o.status}
-          </span>
+          {o.status !== "due" && (
+            <span className={cn("flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium", STATUS_STYLE[o.status])}>
+              {o.status === "paid" && <Check className="size-3" />}
+              {o.status}
+            </span>
+          )}
           <Money paise={o.amountPaise} className="w-20 text-right font-medium" />
         </button>
       ))}
@@ -456,7 +462,7 @@ function LoansCard() {
   const iOwe = open.filter((l) => l.direction === "you_owe").reduce((s, l) => s + l.principalPaise - l.paidPaise, 0);
 
   return (
-    <Card className="lg:col-span-2">
+    <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-2">
         <div className="space-y-1.5">
           <CardTitle>Loans & IOUs</CardTitle>
@@ -468,7 +474,7 @@ function LoansCard() {
           <Plus /> Add
         </Button>
       </CardHeader>
-      <CardContent className="grid gap-2 sm:grid-cols-2">
+      <CardContent className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
         {isPending && <Skeleton className="h-20" />}
         {data?.length === 0 && <p className="text-sm text-muted-foreground">Track money you lent or borrowed, with partial repayments.</p>}
         {data?.map((l) => {
@@ -552,7 +558,7 @@ function LoanForm({ initial, onDone }: { initial: Loan | null; onDone: () => voi
             key={d}
             type="button"
             onClick={() => setDirection(d)}
-            className={`h-9 rounded-md text-sm font-medium ${direction === d ? "bg-background shadow-sm" : "text-muted-foreground"}`}
+            className={`h-9 rounded-md text-sm font-medium ${direction === d ? "bg-card shadow-sm" : "text-muted-foreground"}`}
           >
             {d === "they_owe" ? "I lent" : "I borrowed"}
           </button>

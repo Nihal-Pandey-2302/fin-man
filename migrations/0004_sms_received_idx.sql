@@ -1,0 +1,1 @@
+CREATE INDEX `sms_raw_received_idx` ON `sms_raw` (`received_at`);

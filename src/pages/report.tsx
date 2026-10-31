@@ -1,4 +1,4 @@
-import { TrendingDown, TrendingUp } from "lucide-react";
+import { CircleHelp, TrendingDown, TrendingUp } from "lucide-react";
 import { useState } from "react";
 import { cn } from "cn";
 import type { Report } from "@shared/api";
@@ -64,8 +64,8 @@ export default function ReportPage() {
             <CardHeader>
               <CardTitle>Biggest spends</CardTitle>
             </CardHeader>
-            <CardContent className="-mx-2 px-2">
-              {r.biggest.length === 0 && <p className="text-sm text-muted-foreground">Nothing yet.</p>}
+            <CardContent className="px-2">
+              {r.biggest.length === 0 && <p className="px-2 text-sm text-muted-foreground">Nothing yet.</p>}
               {r.biggest.map((t) => (
                 <TxnRow key={t.id} txn={t} onOpen={(txn) => setEditing({ mode: "edit", txn })} />
               ))}
@@ -127,7 +127,7 @@ function Categories({ r }: { r: Report }) {
           return (
             <div key={c.categoryId ?? "none"} className="space-y-1">
               <div className="flex items-center gap-2 text-sm">
-                <span>{cat?.emoji ?? "❔"}</span>
+                <span className="flex w-5 justify-center">{cat?.emoji ?? <CircleHelp className="size-4 text-muted-foreground" />}</span>
                 <span className="flex-1 truncate">{cat?.name ?? "Uncategorised"}</span>
                 {change !== null && <span className={cn("text-xs", change > 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400")}>{change > 0 ? `+${change}` : change}%</span>}
                 <span className="w-24 text-right tabular-nums">{formatPaise(c.spendPaise)}</span>
@@ -140,7 +140,7 @@ function Categories({ r }: { r: Report }) {
             </div>
           );
         })}
-        {r.previous && <p className="text-xs text-muted-foreground">Faint bars: {formatShortDate(r.previous.startDate)} – {formatShortDate(r.previous.endDate)}</p>}
+        {r.previous && r.byCategory.length > 0 && <p className="text-xs text-muted-foreground">Faint bars: {formatShortDate(r.previous.startDate)} – {formatShortDate(r.previous.endDate)}</p>}
       </CardContent>
     </Card>
   );

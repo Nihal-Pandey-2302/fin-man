@@ -1,3 +1,4 @@
+import { CircleHelp } from "lucide-react";
 import { cn } from "cn";
 import type { Category } from "@shared/api";
 
@@ -44,7 +45,7 @@ export function CategoryBadge({ category }: { category: Category | undefined }) 
       style={{ backgroundColor: category?.color ? `${category.color}26` : "var(--muted)" }}
       aria-hidden
     >
-      {category?.emoji ?? "❔"}
+      {category?.emoji ?? <CircleHelp className="size-4 text-muted-foreground" />}
     </span>
   );
 }

@@ -52,6 +52,15 @@ Read this first if you're resuming after a context reset. Then read CLAUDE.md an
   - [x] Holdings + net worth (basic), JSON export.
   - [x] CSV export (GET /api/export.csv).
 - [x] Final docs: CLAUDE.md layout, PLAN.md status.
+- [x] **UI polish pass** (2026-11-01, daytime):
+  - Fixed a 19px horizontal overflow on Home on phones: an implicit `grid` column grows to its content, so page grids use `grid-cols-1`.
+  - Daily-spend chart spans the whole cycle.
+  - Salary-plan rows stack on phones.
+  - Home gets a first-run "Get set up" checklist (accounts, name, budget, SMS).
+  - New `sms_stale` alert after 3 quiet days, plus "Last SMS received" in Settings. Migration 0004 indexes `sms_raw.received_at`.
+  - Light mode uses an off-white page so cards stand out.
+  - Activity is capped at `max-w-3xl` on desktop.
+  - List padding in cards aligned with the card titles.
 
 ## Waiting on the owner
 1. **SMS sender IDs**, exactly as the phone shows them. Then update KNOWN_SENDERS in worker/sms/senders.ts and add a test.
@@ -73,6 +82,9 @@ Read this first if you're resuming after a context reset. Then read CLAUDE.md an
 - GitHub push needs the noreply email: repo-local user.email = 127308117+Nihal-Pandey-2302@users.noreply.github.com (already set).
 
 ## UI notes / gotchas
+- Responsive page grids must be `grid grid-cols-1 lg:grid-cols-N`. A bare `grid` sizes its implicit column to the content and overflows on phones.
+- In a card, lists of full-width hover rows use `<CardContent className="px-2">` with row `px-2`. That keeps row content aligned with the title at 16px.
+- Never `pkill -f <pattern>` from the Bash tool: it matches and kills the tool's own shell. Stop the dev server with `fuser -k <port>/tcp`, then check for orphaned `workerd`.
 - Chrome's `window.scrollTo` now returns a Promise, so never write `useEffect(() => window.scrollTo(...))` with an expression body: React treats the Promise as a cleanup and crashes ("destroy is not a function").
 - next-themes was removed (React 19 warns about its injected <script>). The theme lives in src/components/theme.tsx, and an inline script in index.html applies it before first paint.
 - shadcn now imports `cn` from the `cn` npm package. That is correct.

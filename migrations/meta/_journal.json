@@ -29,6 +29,13 @@
       "when": 1793476173063,
       "tag": "0003_autopay_link_push",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1793486804952,
+      "tag": "0004_sms_received_idx",
+      "breakpoints": true
     }
   ]
 }

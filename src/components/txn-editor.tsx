@@ -121,7 +121,7 @@ function EditorForm({ target, onDone }: { target: EditorTarget; onDone: () => vo
             key={d}
             type="button"
             onClick={() => switchDirection(d)}
-            className={`h-9 rounded-md text-sm font-medium transition-colors ${direction === d ? "bg-background shadow-sm" : "text-muted-foreground"}`}
+            className={`h-9 rounded-md text-sm font-medium transition-colors ${direction === d ? "bg-card shadow-sm" : "text-muted-foreground"}`}
           >
             {d === "debit" ? "Money out" : "Money in"}
           </button>
@@ -204,7 +204,7 @@ function EditorForm({ target, onDone }: { target: EditorTarget; onDone: () => vo
         <Textarea id="note" value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Optional" />
       </div>
 
-      <div className="sticky bottom-0 flex flex-wrap items-center gap-2 bg-background pt-2">
+      <div className="sticky bottom-0 flex flex-wrap items-center gap-2 bg-popover pt-2">
         {target.mode === "edit" && (
           <AlertDialog>
             <AlertDialogTrigger asChild>

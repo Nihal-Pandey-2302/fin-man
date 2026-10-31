@@ -2,6 +2,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Bell, BellOff, Check, Copy, Download, Moon, Plus, Sun, SunMoon, Trash2 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
+import { cn } from "cn";
 import { formatPaise, rupeesToPaise } from "@shared/money";
 import { NativeSelect } from "@/components/native-select";
 import { useTheme, type Theme } from "@/components/theme";
@@ -12,14 +13,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api, del, errorMessage, patch, post } from "@/lib/api";
-import { invalidateLedger, useLookups } from "@/lib/queries";
+import { invalidateLedger, useDashboard, useLookups } from "@/lib/queries";
+import { relativeTime } from "@/lib/relative";
 import { SubPageHeader } from "./more";
 
 export default function SettingsPage() {
   return (
     <div className="space-y-4">
       <SubPageHeader title="Settings" />
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <GeneralCard />
         <SmsSetupCard />
         <NotificationsCard />
@@ -91,6 +93,19 @@ function GeneralCard() {
   );
 }
 
+/** Is forwarding alive? The newest SMS the server has seen. */
+function SmsStatus() {
+  const { data: d } = useDashboard();
+  if (!d) return null;
+  const stale = d.alerts.some((a) => a.key.startsWith("sms_stale:"));
+  return (
+    <p className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm">
+      <span className={cn("size-2 shrink-0 rounded-full", d.lastSmsAt === null ? "bg-muted-foreground" : stale ? "bg-amber-500" : "bg-emerald-500")} />
+      {d.lastSmsAt === null ? "No SMS received yet" : `Last SMS received ${relativeTime(d.lastSmsAt)}`}
+    </p>
+  );
+}
+
 function SmsSetupCard() {
   const [copied, setCopied] = useState<string | null>(null);
   const url = `${location.origin}/api/ingest/sms`;
@@ -111,6 +126,7 @@ function SmsSetupCard() {
         <CardDescription>MacroDroid: trigger “SMS received” from your bank senders, constraint “text doesn't contain OTP / one time password / verification code”, action HTTP POST.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
+        <SmsStatus />
         <CopyRow label="URL" value={url} copied={copied} onCopy={copy} />
         <CopyRow label="Header" value="Authorization: Bearer <INGEST_SECRET>" copied={copied} onCopy={copy} />
         <CopyRow label="JSON body" value={body} copied={copied} onCopy={copy} />
@@ -255,7 +271,7 @@ function PresetsCard() {
         ))}
         <form onSubmit={add} className="grid grid-cols-2 gap-2">
           <Input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} className="h-11 md:h-9" />
-          <RupeeInput placeholder="Amount (optional)" value={amount} onChange={setAmount} />
+          <RupeeInput placeholder="Amount" value={amount} onChange={setAmount} />
           <NativeSelect aria-label="Category" value={categoryId} onChange={(e) => setCategoryId(e.target.value ? Number(e.target.value) : "")}>
             <option value="">Category</option>
             {activeCategories.map((c) => (
@@ -265,7 +281,7 @@ function PresetsCard() {
             ))}
           </NativeSelect>
           <NativeSelect aria-label="Account" value={accountId} onChange={(e) => setAccountId(e.target.value ? Number(e.target.value) : "")}>
-            <option value="">Default account</option>
+            <option value="">Account</option>
             {activeAccounts.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name}
@@ -300,7 +316,7 @@ function AppearanceCard() {
               key={value}
               type="button"
               onClick={() => setTheme(value)}
-              className={`flex h-9 items-center justify-center gap-2 rounded-md text-sm ${theme === value ? "bg-background font-medium shadow-sm" : "text-muted-foreground"}`}
+              className={`flex h-9 items-center justify-center gap-2 rounded-md text-sm ${theme === value ? "bg-card font-medium shadow-sm" : "text-muted-foreground"}`}
             >
               <Icon className="size-4" /> {label}
             </button>

@@ -1,11 +1,12 @@
-import { AlertCircle, ArrowRight, CalendarClock, CreditCard, Inbox } from "lucide-react";
+import { AlertCircle, ArrowRight, CalendarClock, CircleHelp, CreditCard, Inbox } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 import { cn } from "cn";
 import type { Dashboard, Txn } from "@shared/api";
 import { formatPaise } from "@shared/money";
-import { daysBetween, formatShortDate } from "@shared/time";
+import { addDays, daysBetween, formatShortDate } from "@shared/time";
 import { AlertBanners } from "@/components/alert-banners";
+import { GettingStarted } from "@/components/getting-started";
 import { Money } from "@/components/money";
 import { SalaryPlanCard } from "@/components/salary-plan-card";
 import { TxnEditor, type EditorTarget } from "@/components/txn-editor";
@@ -61,12 +62,14 @@ export default function HomePage() {
 
       {d && <AlertBanners alerts={d.alerts} />}
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="min-w-0 space-y-4 lg:col-span-2">
+          {d && <GettingStarted d={d} />}
           {isPending ? <Skeleton className="h-48 rounded-xl" /> : <SafeToSpend d={d} />}
           {showPlan && <SalaryPlanCard plan={plan} />}
-          {isPending ? <Skeleton className="h-40 rounded-xl" /> : <DailyChart d={d} />}
-          {isPending ? <Skeleton className="h-64 rounded-xl" /> : <ByCategory d={d} />}
+          {/* Empty charts on a fresh install are just noise. */}
+          {isPending ? <Skeleton className="h-40 rounded-xl" /> : (d.daily.length > 0 || d.cycle.budgetPaise > 0) && <DailyChart d={d} />}
+          {isPending ? <Skeleton className="h-64 rounded-xl" /> : d.byCategory.length > 0 && <ByCategory d={d} />}
         </div>
         <div className="space-y-4">
           <Balances d={d} loading={isPending} />
@@ -80,7 +83,7 @@ export default function HomePage() {
                 </Link>
               </Button>
             </CardHeader>
-            <CardContent className="-mx-2 -mt-2 px-2">
+            <CardContent className="-mt-2 px-2">
               {isPending
                 ? Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="my-2 h-12" />)
                 : d.recent.length === 0
@@ -151,44 +154,54 @@ function SafeToSpend({ d }: { d: Dashboard }) {
   );
 }
 
+/** One bar per day of the whole cycle; days still to come are faint stubs, so the chart also shows how far in you are. */
 function DailyChart({ d }: { d: Dashboard }) {
-  const days = Math.max(1, daysBetween(d.cycle.startDate, d.today) + 1);
+  const allowance = d.cycle.dailyAllowancePaise;
+  const length = Math.min(45, Math.max(1, daysBetween(d.cycle.startDate, d.cycle.endDate) + 1));
   const byDate = new Map(d.daily.map((x) => [x.date, x.spentPaise]));
-  const series = Array.from({ length: Math.min(days, 45) }, (_, i) => {
-    const date = new Date(Date.parse(`${d.today}T00:00:00Z`) - (Math.min(days, 45) - 1 - i) * 86_400_000).toISOString().slice(0, 10);
-    return { date, paise: Math.max(0, byDate.get(date) ?? 0) };
+  const series = Array.from({ length }, (_, i) => {
+    const date = addDays(d.cycle.startDate, i);
+    return { date, paise: Math.max(0, byDate.get(date) ?? 0), future: date > d.today };
   });
-  const max = Math.max(d.cycle.dailyAllowancePaise, ...series.map((s) => s.paise), 1);
+  const past = series.filter((s) => !s.future);
+  const max = Math.max(allowance, ...past.map((s) => s.paise), 1);
+  const overDays = allowance > 0 ? past.filter((s) => s.paise > allowance).length : 0;
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-baseline justify-between">
         <CardTitle>Daily spend</CardTitle>
+        <span className="text-xs text-muted-foreground">
+          {overDays > 0 ? `${overDays} of ${past.length} ${past.length === 1 ? "day" : "days"} over` : `${past.length} of ${length} days in`}
+        </span>
       </CardHeader>
       <CardContent>
-        <div className="relative flex h-28 items-end gap-[3px]">
-          {d.cycle.dailyAllowancePaise > 0 && (
+        <div className="relative flex h-28 items-end gap-[2px]">
+          {allowance > 0 && (
             <div
-              className="pointer-events-none absolute inset-x-0 border-t border-dashed border-muted-foreground/40"
-              style={{ bottom: `${(d.cycle.dailyAllowancePaise / max) * 100}%` }}
-              title="Daily allowance"
+              className="pointer-events-none absolute inset-x-0 border-t border-dashed border-muted-foreground/50"
+              style={{ bottom: `${(allowance / max) * 100}%` }}
             />
           )}
           {series.map((s) => (
             <div
               key={s.date}
-              title={`${formatShortDate(s.date)}: ${formatPaise(s.paise)}`}
+              title={s.future ? formatShortDate(s.date) : `${formatShortDate(s.date)}: ${formatPaise(s.paise)}`}
               className={cn(
-                "min-w-0 flex-1 rounded-t-sm transition-all",
-                s.date === d.today ? "bg-primary" : "bg-primary/35",
-                d.cycle.dailyAllowancePaise > 0 && s.paise > d.cycle.dailyAllowancePaise && "bg-destructive/70",
+                "min-w-0 flex-1 rounded-t-[3px] transition-[height]",
+                s.future ? "bg-muted" : allowance > 0 && s.paise > allowance ? "bg-destructive/75" : s.date === d.today ? "bg-primary" : "bg-primary/40",
               )}
-              style={{ height: `${Math.max(2, (s.paise / max) * 100)}%` }}
+              style={{ height: s.future ? "3px" : `${Math.max(3, (s.paise / max) * 100)}%` }}
             />
           ))}
         </div>
-        <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
+        <div className="mt-1.5 flex justify-between text-[11px] text-muted-foreground">
           <span>{formatShortDate(series[0].date)}</span>
-          <span>Today</span>
+          {allowance > 0 && (
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-3 border-t border-dashed border-muted-foreground" /> {formatPaise(allowance)}/day
+            </span>
+          )}
+          <span>{formatShortDate(series[series.length - 1].date)}</span>
         </div>
       </CardContent>
     </Card>
@@ -217,7 +230,7 @@ function ByCategory({ d }: { d: Dashboard }) {
           return (
             <div key={r.categoryId ?? "none"} className="space-y-1">
               <div className="flex items-center gap-2 text-sm">
-                <span>{cat?.emoji ?? "❔"}</span>
+                <span className="flex w-5 justify-center">{cat?.emoji ?? <CircleHelp className="size-4 text-muted-foreground" />}</span>
                 <span className="flex-1 truncate">{cat?.name ?? "Uncategorised"}</span>
                 <span className={cn("tabular-nums", over && "text-destructive")}>
                   {formatPaise(r.spentPaise)}
@@ -243,18 +256,8 @@ function Balances({ d, loading }: { d?: Dashboard; loading: boolean }) {
   const banks = activeAccounts.filter((a) => a.kind !== "credit_card");
   const cards = activeAccounts.filter((a) => a.kind === "credit_card");
   if (loading) return <Skeleton className="h-56 rounded-xl" />;
-  if (activeAccounts.length === 0) {
-    return (
-      <Card>
-        <CardContent className="space-y-3 py-6">
-          <p className="text-sm">Add your bank accounts and card so SMS can be matched to them.</p>
-          <Button asChild>
-            <Link to="/more/accounts">Set up accounts</Link>
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  }
+  // No accounts yet: the getting-started card leads there.
+  if (activeAccounts.length === 0) return null;
   return (
     <>
       <Card>

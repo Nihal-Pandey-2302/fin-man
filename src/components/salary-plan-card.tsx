@@ -42,17 +42,17 @@ export function SalaryPlanCard({ plan }: { plan: SalaryPlan }) {
             {item.done ? <CheckCircle2 className="size-5 shrink-0 text-emerald-500" /> : <Circle className="size-5 shrink-0 text-muted-foreground" />}
             <div className="min-w-0 flex-1">
               <p className={item.done ? "text-muted-foreground line-through decoration-1" : "font-medium"}>{item.label}</p>
-              <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
-                {salary.name} <ArrowRight className="size-3" /> {account(item.toAccountId)?.name}
+              <p className="truncate text-xs text-muted-foreground">
+                {salary.name} <ArrowRight className="inline size-3 align-[-2px]" /> {account(item.toAccountId)?.name}
                 {item.sentPaise > 0 && ` · sent ${formatPaise(item.sentPaise)}`}
               </p>
             </div>
             {item.done ? (
               <span className="text-sm text-muted-foreground">Done</span>
             ) : (
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 flex-col items-end gap-1 sm:flex-row sm:items-center sm:gap-2">
                 <span className="font-semibold tabular-nums">{formatPaise(item.needPaise)}</span>
-                <Button size="sm" variant="outline" disabled={busy === item.key} onClick={() => record(item)}>
+                <Button size="sm" variant="outline" className="h-7 px-2.5 text-xs sm:h-8 sm:px-3 sm:text-sm" disabled={busy === item.key} onClick={() => record(item)}>
                   Record
                 </Button>
               </div>
