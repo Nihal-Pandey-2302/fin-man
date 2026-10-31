@@ -1,0 +1,2 @@
+# Copy to .dev.vars for local dev. In production this is a Worker secret (`wrangler secret put INGEST_SECRET`).
+INGEST_SECRET=dev-ingest-secret
