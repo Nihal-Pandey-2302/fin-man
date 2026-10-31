@@ -4,7 +4,8 @@ Read this first if you're resuming after a context reset. Then read CLAUDE.md an
 
 ## Mandate (from the owner, 2026-11-01 ~00:30 IST)
 - Finish **Phase 1** of PLAN.md tonight, then continue into **Phase 2**. The owner is asleep and has granted permission to proceed without check-ins.
-- Work on branch `revamp` and commit after each coherent chunk. **Do not push** (the GitHub remote `fin-man` is PUBLIC).
+- Work on branch `revamp` and commit after each coherent chunk. **Pushing `revamp` is allowed** (owner, 00:40 IST), but the GitHub remote `fin-man` is PUBLIC: no personal data in commits.
+- Keep resource use light: the owner has another build running. Run one heavy process at a time, always kill dev servers after checks, and don't use parallel agents.
 - **Do not deploy**, use `--remote`, set secrets, or configure Cloudflare Access.
 - The owner sends **SMS sender IDs tomorrow**. Until then, the sender→bank routing tokens in `worker/sms/senders.ts` are provisional, and parsing relies on body signatures.
 - Fixtures must use fake digits and names. The repo is public.
