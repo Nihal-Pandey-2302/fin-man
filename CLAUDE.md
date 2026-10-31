@@ -26,6 +26,7 @@ First run: `npm install && cp .dev.vars.example .dev.vars && npm run db:migrate`
 - `npm run db:generate`: drizzle-kit turns `worker/db/schema.ts` into SQL in `migrations/`. `npm run db:migrate` applies it to the **local** D1.
 - `npm run backup`: dumps every table to `backups/fintrack-local-<time>.json` (gitignored). Add `-- --remote` to dump the deployed D1 instead, using your wrangler login.
 - `npm run pwa-assets`: regenerate PWA icons from `public/icon.svg`.
+- `npm run vapid`: generate VAPID keys for web push into `.dev.vars`.
 - `npm run cf-typegen`: regenerate `worker-configuration.d.ts` after editing `wrangler.jsonc` or `.dev.vars`.
 - There is intentionally no `deploy` script yet (see Guardrails).
 
@@ -33,10 +34,20 @@ Both dev servers share the local D1 in `.wrangler/state`. Delete that folder to 
 
 ## Layout
 
-- `worker/`: Hono API, mounted at `/api/*` (`run_worker_first`). Everything else is the SPA, served with SPA fallback. `worker/db/schema.ts` holds the Drizzle schema.
+- `worker/`: Hono API, mounted at `/api/*` (`run_worker_first`). Everything else is the SPA, served with SPA fallback. `index.ts` default-exports `{ fetch, scheduled }`, and the daily cron (09:00 IST) runs `daily.ts`.
+  - `db/`: Drizzle schema plus `getDb()`.
+  - `sms/`: the ingest pipeline. `normalize` handles sender/body/hash, `classify` handles OTP/promo, `senders` is the allowlist, `parsers/*` holds one module per bank, and `ingest.ts` runs store → parse → resolve account → rules → settle.
+  - `ledger/`: domain logic.
+    - `settle.ts` orders what happens to each new transaction: salary, then autopay match, then transfer pairing.
+    - `salary`, `autopays` (match/calendar/heads-ups), `matcher` (transfers, owner names), `rules`.
+    - `balances`, `cycles`, `dashboard` (`SPEND` is the single definition of spending), `alerts`, `salary-plan`, `report`, `settings`.
+  - `routes/`: thin Hono routers with zod validation. `push.ts` holds web push (VAPID).
+- `shared/`: code used by both Worker and SPA: `money` (paise), `time` (IST), and `api` (DTO types; the SPA imports these as `@shared/*`).
 - `src/`: React SPA. `components/ui/` is shadcn-generated (edit freely, but regenerate with `npx shadcn add`). `components/layout/` holds the responsive shell. `pages/` has one file per route.
 - `migrations/`: generated SQL, committed, applied by wrangler.
-- `tests/`: Vitest. Parser fixtures go in `tests/fixtures/sms/<bank>/`.
+- `tests/`: Vitest. Parser fixtures go in `tests/fixtures/sms/<bank>/`, and `helpers.ts` has `api()`, `postSms()`, `seedAccounts()` and `resetLedger()`.
+- Every new transaction must go through `settleNewTransaction`. Every edit or delete must undo what that set up (`unpairGroup`, `unmatchAutopay`, `unlinkSalary`); see `updateTxn`.
+- Workers free plan: ~10 ms CPU per request. Keep request handlers I/O-bound and batch heavy work (the SMS import sends batches of 20).
 - shadcn's `cn` comes from the `cn` npm package (the new shadcn default), not a local clsx/tailwind-merge helper.
 - Versions: Vite 8, React 19, react-router 8, Tailwind 4, TypeScript 6.0 (pinned to match Cloudflare's template, not TS 7), Vitest 5.
 

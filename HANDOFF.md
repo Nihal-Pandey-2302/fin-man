@@ -48,10 +48,22 @@ Read this first if you're resuming after a context reset. Then read CLAUDE.md an
   - [x] h. UI: Home alert banners, a salary-plan card (Home when a cycle started ≤5 days ago, plus Plan), the autopay calendar in Plan, a Report page (/plan/report), and a notifications toggle in Settings.
   - [x] i. Tests (94), code review (10 findings fixed, tests/phase2-regressions.test.ts), browser check.
 - [ ] **Phase 3 (partial, optional tonight):**
-  - [ ] SMS Backup & Restore XML import. Parse in the browser (DOMParser) and POST batches of 20 to /api/import/sms (behind Access, no bearer); the Worker free plan allows ~10 ms CPU per request.
+  - [x] SMS Backup & Restore XML import. Parse in the browser (DOMParser) and POST batches of 20 to /api/import/sms (behind Access, no bearer); the Worker free plan allows ~10 ms CPU per request.
   - [x] Holdings + net worth (basic), JSON export.
-  - [ ] CSV export.
-- [ ] Final: update CLAUDE.md (layout, Phase 2 modules), PLAN.md status, and the summary for the owner.
+  - [x] CSV export (GET /api/export.csv).
+- [x] Final docs: CLAUDE.md layout, PLAN.md status.
+
+## Waiting on the owner
+1. **SMS sender IDs**, exactly as the phone shows them. Then update KNOWN_SENDERS in worker/sms/senders.ts and add a test.
+2. **More SMS samples**: salary NEFT credit, card "payment received", refund, ATM, NACH debit, low-balance. Add a fixture and an expectation for each, then a parser rule.
+3. **Go-ahead to deploy.** Checklist (do NOT run before then):
+   - `npx wrangler login`, then `npx wrangler d1 create fintrack` and put the database_id in wrangler.jsonc (or rely on auto-provisioning).
+   - `npx wrangler d1 migrations apply DB --remote`
+   - Secrets: `npx wrangler secret put INGEST_SECRET` (a long random value), `VAPID_PRIVATE_KEY`. Vars: VAPID_PUBLIC_KEY and VAPID_SUBJECT (the owner's mailto).
+   - Add a `deploy` script (`npm run build && wrangler deploy`), then deploy.
+   - Cloudflare Access: protect the whole hostname (allow only the owner's email) and add a **bypass** policy for `/api/ingest/*`.
+   - MacroDroid: the HTTP POST from Settings → Phone SMS forwarding, with the bearer secret.
+4. Local D1 currently holds **demo data** (fake fixture accounts). Reset with `rm -rf .wrangler/state && npm run db:migrate`.
 
 ## API notes
 - Spending = expense + fee debits − refund credits. Transfers, card_payment, income and investment never count, and SIP autopays are excluded from "autopays still due".

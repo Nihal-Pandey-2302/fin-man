@@ -157,6 +157,11 @@ One responsive app, designed **phone-first**: it must be just as good on a phone
 - CSV/JSON export and import, and the SMS backup XML import.
 - Optional native Android companion app (Kotlin) that reads SMS directly and queues them with retries, replacing MacroDroid.
 
+### Status (2026-11-01)
+- **Phase 1:** done, except deploying behind Cloudflare Access, which waits for the owner's go-ahead. The bank parsers cover the sample formats received so far: HDFC UPI debit/credit, IDFC account credit and UPI debit, IDFC credit card spend, Indian Bank UPI debit/credit, IMPS credit and the autopay heads-up. Still needed: salary NEFT, card "payment received", refund, ATM and NACH samples.
+- **Phase 2:** done. That covers salary detection, the salary-day plan, autopay matching with a calendar and low-balance warning, card reminders (web push + banners) and the cycle report.
+- **Phase 3:** partly done: the holdings page with net worth, JSON and CSV export, and the SMS Backup XML import. Not started: the native Android companion.
+
 ---
 
 ## 6. Non-goals (for now)
