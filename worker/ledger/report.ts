@@ -4,7 +4,7 @@ import { addDays, addMonths, daysBetween, istDate, istDayStart } from "../../sha
 import type { Db } from "../db";
 import { budgetCycles, transactions } from "../db/schema";
 import { currentCycle } from "./cycles";
-import { SPEND } from "./dashboard";
+import { serializeTxn, SPEND } from "./dashboard";
 
 type Period = { startDate: string; endDate: string };
 
@@ -75,7 +75,7 @@ export async function buildReport(db: Db, start?: string, today = istDate()): Pr
     previous: previous ? { ...previous, spendPaise: prevSpend } : null,
     byCategory,
     topMerchants: merchants.map((m) => ({ merchant: m.merchant, spendPaise: m.spend, count: m.count })),
-    biggest: biggest.map((t) => ({ ...t, occurredAt: t.occurredAt.toISOString(), createdAt: t.createdAt.toISOString(), updatedAt: t.updatedAt.toISOString() })),
+    biggest: biggest.map(serializeTxn),
     periods: list,
   };
 }

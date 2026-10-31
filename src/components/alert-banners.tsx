@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { cn } from "cn";
 import type { Alert } from "@shared/api";
-import { istDate } from "@shared/time";
+import { addDays, istDate } from "@shared/time";
 import { load, save } from "@/lib/storage";
 
 const STYLE = {
@@ -19,9 +19,10 @@ export function AlertBanners({ alerts }: { alerts: Alert[] }) {
   const visible = alerts.filter((a) => !dismissed[a.key]);
   if (!visible.length) return null;
   const dismiss = (key: string) => {
-    // Keep only recent dismissals so storage doesn't grow forever.
+    // Forget dismissals after 40 days so storage doesn't grow forever.
     const today = istDate();
-    const next = Object.fromEntries(Object.entries({ ...dismissed, [key]: today }).filter(([, d]) => d >= today.slice(0, 7)));
+    const cutoff = addDays(today, -40);
+    const next = Object.fromEntries(Object.entries({ ...dismissed, [key]: today }).filter(([, d]) => d >= cutoff));
     setDismissed(next);
     save("dismissedAlerts", next);
   };

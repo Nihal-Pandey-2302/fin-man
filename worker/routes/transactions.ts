@@ -7,7 +7,8 @@ import { addDays, istDayStart } from "../../shared/time";
 import type { Db } from "../db";
 import { accounts, DIRECTIONS, INCOME_SOURCES, smsRaw, transactions, TXN_KINDS, TXN_STATUSES } from "../db/schema";
 import { unpairGroup } from "../ledger/matcher";
-import { detectSalary } from "../ledger/salary";
+import { unmatchAutopay } from "../ledger/autopays";
+import { detectSalary, unlinkSalary } from "../ledger/salary";
 import { settleNewTransaction } from "../ledger/settle";
 import { applyRuleToUncategorized, learnRule } from "../ledger/rules";
 import { processSms } from "../sms/ingest";
@@ -79,6 +80,12 @@ export async function updateTxn(db: Db, txnId: number, patch: Patch) {
     (fields.direction !== undefined && fields.direction !== t.direction) ||
     (fields.accountId !== undefined && fields.accountId !== t.accountId);
   if (t.transferGroupId && breaksPair) await unpairGroup(db, t.transferGroupId);
+  // Same for links that depended on the old facts: autopay matches and salary detection.
+  const kindAfter = fields.kind ?? t.kind;
+  if (t.autopayId && (breaksPair || (kindAfter !== "expense" && kindAfter !== "investment"))) await unmatchAutopay(db, t);
+  if (t.incomeSource === "salary" && ((fields.incomeSource !== undefined && fields.incomeSource !== "salary") || kindAfter !== "income" || breaksPair)) {
+    await unlinkSalary(db, t);
+  }
 
   const [row] = await db
     .update(transactions)
@@ -203,6 +210,8 @@ export const transactionRoutes = new Hono<AppEnv>()
     const t = await db.select().from(transactions).where(eq(transactions.id, c.req.valid("param").id)).get();
     if (!t) return c.json({ error: "not_found" }, 404);
     if (t.transferGroupId) await unpairGroup(db, t.transferGroupId);
+    await unmatchAutopay(db, t);
+    await unlinkSalary(db, t);
     await db.delete(transactions).where(eq(transactions.id, t.id));
     // Keep the SMS but make sure a reprocess can't resurrect the deleted transaction.
     if (t.smsId) await db.update(smsRaw).set({ parseStatus: "ignored", error: "deleted_by_user" }).where(eq(smsRaw.id, t.smsId));

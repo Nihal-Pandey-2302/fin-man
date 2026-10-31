@@ -40,9 +40,10 @@ export async function buildSalaryPlan(db: Db, today = istDate()): Promise<Salary
         .where(and(inArray(transactions.kind, ["transfer", "card_payment"]), gte(transactions.occurredAt, istDayStart(cycle.startDate))))
         .all()
     : [];
-  const fromSalary = new Set(legs.filter((l) => l.accountId === salary?.id && l.direction === "debit").map((l) => l.groupId));
+  // Only paired legs count (an unpaired leg has no group, and null must never match null).
+  const fromSalary = new Set(legs.filter((l) => l.groupId !== null && l.accountId === salary?.id && l.direction === "debit").map((l) => l.groupId));
   const sentTo = (toId: number) =>
-    legs.filter((l) => l.accountId === toId && l.direction === "credit" && fromSalary.has(l.groupId)).reduce((s, l) => s + l.amountPaise, 0);
+    legs.filter((l) => l.groupId !== null && l.accountId === toId && l.direction === "credit" && fromSalary.has(l.groupId)).reduce((s, l) => s + l.amountPaise, 0);
 
   const spentSoFar = await spentBetween(db, istDayStart(cycle.startDate), istDayStart(addDays(today, 1)));
   const items: SalaryPlan["items"] = [];

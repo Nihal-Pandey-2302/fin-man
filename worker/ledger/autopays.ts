@@ -4,6 +4,8 @@ import { addDays, addMonths, daysBetween, istDate, istDayStart } from "../../sha
 import type { Db } from "../db";
 import { accounts, autopays, transactions } from "../db/schema";
 import type { ParsedNotice } from "../sms/parsers";
+import { isOwnerName } from "./matcher";
+import { getSetting } from "./settings";
 
 type Autopay = typeof autopays.$inferSelect;
 export const MONTHS_PER = { monthly: 1, quarterly: 3, yearly: 12 } as const;
@@ -34,6 +36,9 @@ const mentions = (text: string | null, a: Autopay) => {
 export async function matchAutopay(db: Db, txnId: number): Promise<number | null> {
   const t = await db.select().from(transactions).where(eq(transactions.id, txnId)).get();
   if (!t || t.direction !== "debit" || t.autopayId || t.transferGroupId) return null;
+  if (t.kind !== "expense" && t.kind !== "investment") return null;
+  // Money sent to yourself is a transfer, never an autopay.
+  if (t.merchant && isOwnerName(t.merchant, await getSetting(db, "owner_names"))) return null;
   const date = istDate(t.occurredAt);
   const candidates = (await db.select().from(autopays).where(and(eq(autopays.accountId, t.accountId), eq(autopays.active, true))).all())
     .map((a) => ({ a, amount: amountClose(t.amountPaise, a.amountPaise), named: mentions(t.merchant, a), gap: Math.abs(daysBetween(a.nextDueOn, date)) }))
@@ -53,6 +58,21 @@ export async function matchAutopay(db: Db, txnId: number): Promise<number | null
     .where(eq(transactions.id, t.id));
   await advanceAutopay(db, best.id);
   return best.id;
+}
+
+/**
+ * Undo a match (the debit was deleted, or edited into something else): unlink it and move the autopay's
+ * due date back one period, if the advance it caused is still in place.
+ */
+export async function unmatchAutopay(db: Db, txn: typeof transactions.$inferSelect) {
+  if (!txn.autopayId) return;
+  await db.update(transactions).set({ autopayId: null }).where(eq(transactions.id, txn.id));
+  const a = await db.select().from(autopays).where(eq(autopays.id, txn.autopayId)).get();
+  if (!a) return;
+  const previous = addMonths(a.nextDueOn, -MONTHS_PER[a.frequency], a.dayOfMonth);
+  if (Math.abs(daysBetween(previous, istDate(txn.occurredAt))) <= DATE_TOLERANCE_DAYS) {
+    await db.update(autopays).set({ nextDueOn: previous }).where(eq(autopays.id, a.id));
+  }
 }
 
 /** Find the tracked autopay an SMS heads-up refers to (same bank, amount or payee name). */

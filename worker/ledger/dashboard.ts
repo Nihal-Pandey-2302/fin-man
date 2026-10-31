@@ -43,7 +43,7 @@ export async function buildDashboard(db: Db, now = new Date()): Promise<Dashboar
   const to = istDayStart(addDays(cycle.endDate, 1));
   const inCycle = and(gte(transactions.occurredAt, from), lt(transactions.occurredAt, to));
 
-  const [daily, byCategory, limits, dueAutopays, recent, accountRows, buffer, review, alerts] = await Promise.all([
+  const [daily, byCategory, limits, dueAutopays, recent, accountRows, buffer, review] = await Promise.all([
     db
       .select({ date: istDay, spentPaise: sql<number>`SUM(${SPEND})` })
       .from(transactions)
@@ -70,7 +70,6 @@ export async function buildDashboard(db: Db, now = new Date()): Promise<Dashboar
     db.select().from(accounts).where(eq(accounts.archived, false)).all(),
     getSetting(db, "liquid_buffer_paise"),
     reviewCount(db),
-    buildAlerts(db, today),
   ]);
 
   const spentPaise = daily.reduce((s, d) => s + d.spentPaise, 0);
@@ -83,6 +82,7 @@ export async function buildDashboard(db: Db, now = new Date()): Promise<Dashboar
   const dailyAllowancePaise = Math.max(0, Math.floor(remainingAtDayStart / daysLeft));
 
   const balances = await computeBalances(db, accountRows, today);
+  const alerts = await buildAlerts(db, today, { accountRows, balances, cycle });
   const liquidPaise = accountRows
     .filter((a) => a.kind !== "credit_card")
     .reduce((s, a) => s + (balances.get(a.id)?.balancePaise ?? 0), 0);

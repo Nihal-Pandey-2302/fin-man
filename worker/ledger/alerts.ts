@@ -1,5 +1,5 @@
 import { and, desc, eq, gte } from "drizzle-orm";
-import type { Alert } from "../../shared/api";
+import type { AccountBalance, Alert } from "../../shared/api";
 import { formatPaise } from "../../shared/money";
 import { addDays, addMonths, daysBetween, formatShortDate, istDate, istDayStart, parseDate } from "../../shared/time";
 import type { Db } from "../db";
@@ -7,7 +7,7 @@ import { accounts, smsRaw, transactions } from "../db/schema";
 import type { ParsedNotice } from "../sms/parsers";
 import { autopayCalendar, findAutopayForNotice } from "./autopays";
 import { computeBalances } from "./balances";
-import { currentCycle } from "./cycles";
+import { currentCycle, type CurrentCycle } from "./cycles";
 import { getSettings } from "./settings";
 
 const inDays = (n: number) => (n === 0 ? "today" : n === 1 ? "tomorrow" : `in ${n} days`);
@@ -17,14 +17,16 @@ const inDays = (n: number) => (n === 0 ? "today" : n === 1 ? "tomorrow" : `in ${
  * salary not in yet, card bill due soon, autopay account short of what's due, autopays due tomorrow,
  * and bank autopay heads-ups for mandates that aren't tracked.
  */
-export async function buildAlerts(db: Db, today = istDate()): Promise<Alert[]> {
+type Precomputed = { accountRows: (typeof accounts.$inferSelect)[]; balances: Map<number, AccountBalance>; cycle: CurrentCycle };
+
+export async function buildAlerts(db: Db, today = istDate(), pre?: Precomputed): Promise<Alert[]> {
   const alerts: Alert[] = [];
   const [accountRows, settings, cycle] = await Promise.all([
-    db.select().from(accounts).where(eq(accounts.archived, false)).all(),
+    pre?.accountRows ?? db.select().from(accounts).where(eq(accounts.archived, false)).all(),
     getSettings(db),
-    currentCycle(db, today),
+    pre?.cycle ?? currentCycle(db, today),
   ]);
-  const balances = await computeBalances(db, accountRows, today);
+  const balances = pre?.balances ?? (await computeBalances(db, accountRows, today));
 
   // Salary missing: from the 5th, if no salary since the 28th of last month.
   const day = parseDate(today).d;
@@ -57,9 +59,13 @@ export async function buildAlerts(db: Db, today = istDate()): Promise<Alert[]> {
     }
   }
 
-  // Autopays: account short of what's still due this cycle, and tomorrow's debits.
-  const occurrences = await autopayCalendar(db, today, cycle.endDate, today);
-  for (const acc of accountRows) {
+  // Autopays: overdue ones not seen yet, account short of what's still due (overdue included), tomorrow's.
+  const occurrences = await autopayCalendar(db, cycle.startDate < today ? cycle.startDate : today, cycle.endDate, today);
+  for (const o of occurrences.filter((x) => x.status === "overdue")) {
+    alerts.push({ key: `autopay_overdue:${o.autopayId}:${o.dueOn}`, level: "warn", title: `${o.name} not seen yet`, body: `${formatPaise(o.amountPaise)} was due ${formatShortDate(o.dueOn)}. If it went through, mark it paid in Plan.`, href: "/plan" });
+  }
+  // Cards are excluded: their balance is money owed, not money available.
+  for (const acc of accountRows.filter((a) => a.kind !== "credit_card")) {
     const due = occurrences.filter((o) => o.accountId === acc.id && o.status !== "paid").reduce((s, o) => s + o.amountPaise, 0);
     const bal = balances.get(acc.id)?.balancePaise ?? 0;
     if (due > 0 && bal < due) {
@@ -84,10 +90,15 @@ export async function buildAlerts(db: Db, today = istDate()): Promise<Alert[]> {
     .where(and(eq(smsRaw.error, "autopay_upcoming"), gte(smsRaw.receivedAt, istDayStart(addDays(today, -10)))))
     .orderBy(desc(smsRaw.receivedAt))
     .all();
+  const seen = new Set<string>();
   for (const n of notices) {
     const notice = JSON.parse(n.parsedJson ?? "null") as ParsedNotice | null;
-    if (!notice || notice.dueOn < today || (await findAutopayForNotice(db, notice))) continue;
-    alerts.push({ key: `untracked_autopay:${notice.payee}:${notice.dueOn}`, level: "info", title: `Untracked autopay: ${notice.payee}`, body: `${formatPaise(notice.amountPaise)} on ${formatShortDate(notice.dueOn)}. Add it so safe-to-spend accounts for it.`, href: "/plan" });
+    // Banks repeat the heads-up; one alert per mandate and date.
+    const key = notice && `untracked_autopay:${notice.payee}:${notice.dueOn}`;
+    if (!notice || !key || seen.has(key) || notice.dueOn < today) continue;
+    seen.add(key);
+    if (await findAutopayForNotice(db, notice)) continue;
+    alerts.push({ key, level: "info", title: `Untracked autopay: ${notice.payee}`, body: `${formatPaise(notice.amountPaise)} on ${formatShortDate(notice.dueOn)}. Add it so safe-to-spend accounts for it.`, href: "/plan" });
   }
 
   return alerts;
