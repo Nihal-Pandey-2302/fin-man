@@ -91,6 +91,7 @@ function EditorForm({ target, onDone }: { target: EditorTarget; onDone: () => vo
       return post(`/transactions`, { ...body, smsId: sms?.id });
     },
     (r) => {
+      if ((r as { linked?: boolean })?.linked) return "Matched to the transaction you'd already entered";
       const applied = (r as { appliedTo?: number })?.appliedTo ?? 0;
       return applied > 0 ? `Saved · also categorised ${applied} similar` : "Saved";
     },

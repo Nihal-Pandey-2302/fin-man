@@ -146,5 +146,12 @@ export type Dashboard = {
   reviewCount: number;
   /** Newest SMS received from the phone (ISO), null before the first one. */
   lastSmsAt: string | null;
+  salary: {
+    /** Payday is near and no salary has been recorded for it yet. */
+    awaiting: boolean;
+    /** The most recent salary, to prefill the next one. */
+    lastPaise: number | null;
+    lastAccountId: number | null;
+  };
   alerts: Alert[];
 };

@@ -59,7 +59,7 @@ export async function buildAlerts(db: Db, today = istDate(), pre?: Precomputed):
         .limit(1)
         .get();
       if (!thisMonth) {
-        alerts.push({ key: `salary_missing:${today.slice(0, 7)}`, level: "warn", title: "Salary not detected yet", body: "If it has arrived, mark the credit as salary in the review inbox.", href: "/activity" });
+        alerts.push({ key: `salary_missing:${today.slice(0, 7)}`, level: "warn", title: "Salary not recorded yet", body: "If it has arrived, record it so the new cycle starts.", href: "/?salary=1" });
       }
     }
   }

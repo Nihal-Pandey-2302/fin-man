@@ -9,6 +9,7 @@ import { formatPaise, rupeesToPaise } from "@shared/money";
 import { formatShortDate, istDate } from "@shared/time";
 import { Money } from "@/components/money";
 import { SalaryPlanCard } from "@/components/salary-plan-card";
+import { SalarySheet } from "@/components/salary-sheet";
 import { NativeSelect } from "@/components/native-select";
 import { ResponsiveSheet } from "@/components/responsive-sheet";
 import { RupeeInput } from "@/components/rupee-input";
@@ -53,6 +54,7 @@ function CycleCard() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [limitsOpen, setLimitsOpen] = useState(false);
+  const [salaryOpen, setSalaryOpen] = useState(false);
   const current = cycles?.find((c) => c.id === d?.cycle.id);
 
   return (
@@ -73,6 +75,9 @@ function CycleCard() {
         )}
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => setOpen(true)}>{d?.cycle.id ? "Edit budget" : "Set budget"}</Button>
+          <Button variant="outline" onClick={() => setSalaryOpen(true)}>
+            Salary received
+          </Button>
           {d?.cycle.id && (
             <Button variant="outline" onClick={() => setLimitsOpen(true)}>
               Category limits{current?.budgets.length ? ` (${current.budgets.length})` : ""}
@@ -81,6 +86,7 @@ function CycleCard() {
         </div>
       </CardContent>
 
+      <SalarySheet open={salaryOpen} onOpenChange={setSalaryOpen} />
       <ResponsiveSheet open={open} onOpenChange={setOpen} title="Cycle budget" description="How much you plan to spend this cycle, including bills and EMIs (not SIPs).">
         {open && d && (
           <CycleForm

@@ -199,8 +199,10 @@ function PairCard({ legs, onConfirm, onUnpair }: { legs: Txn[]; onConfirm: () =>
 function SmsCard({ sms, onCreate }: { sms: Sms; onCreate: () => void }) {
   const missing = sms.error?.startsWith("no_account:") ? sms.error.split(":") : null;
   const retry = async () => {
-    const out = await post<{ status: string }>(`/review/sms/${sms.id}/reprocess`);
-    toast[out.status === "created" ? "success" : "info"](out.status === "created" ? "Imported" : "Still can't read it");
+    const out = await post<{ status: string; reason?: string }>(`/review/sms/${sms.id}/reprocess`);
+    if (out.status === "created") toast.success("Imported");
+    else if (out.reason === "linked_manual") toast.success("Matched to a transaction you entered");
+    else toast.info("Still can't read it");
     invalidateLedger();
   };
   const dismiss = async () => {

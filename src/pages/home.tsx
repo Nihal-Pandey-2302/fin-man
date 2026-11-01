@@ -1,6 +1,6 @@
-import { AlertCircle, ArrowRight, CalendarClock, CircleHelp, CreditCard, Inbox } from "lucide-react";
+import { AlertCircle, ArrowRight, BriefcaseBusiness, CalendarClock, CircleHelp, CreditCard, Inbox } from "lucide-react";
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { cn } from "cn";
 import type { Dashboard, Txn } from "@shared/api";
 import { formatPaise } from "@shared/money";
@@ -9,6 +9,7 @@ import { AlertBanners } from "@/components/alert-banners";
 import { GettingStarted } from "@/components/getting-started";
 import { Money } from "@/components/money";
 import { SalaryPlanCard } from "@/components/salary-plan-card";
+import { SalarySheet } from "@/components/salary-sheet";
 import { TxnEditor, type EditorTarget } from "@/components/txn-editor";
 import { TxnRow } from "@/components/txn-row";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,10 @@ export default function HomePage() {
   const [editing, setEditing] = useState<EditorTarget | null>(null);
   const { data: plan } = useSalaryPlan();
   const showPlan = !!d && !!plan && daysBetween(plan.cycleStart, d.today) <= 5 && plan.items.some((i) => !i.done);
+  // The salary sheet lives in the URL (/?salary=1), so the "salary not recorded" alert and push can open it.
+  const [params, setParams] = useSearchParams();
+  const salaryOpen = params.get("salary") === "1";
+  const setSalaryOpen = (open: boolean) => setParams(open ? { salary: "1" } : {}, { replace: !open });
 
   if (isError) {
     return (
@@ -60,7 +65,22 @@ export default function HomePage() {
         </Link>
       )}
 
-      {d && <AlertBanners alerts={d.alerts} />}
+      {d?.salary.awaiting && (
+        <button
+          type="button"
+          onClick={() => setSalaryOpen(true)}
+          className="flex w-full items-center gap-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-left text-sm transition-colors hover:bg-emerald-500/15"
+        >
+          <BriefcaseBusiness className="size-5 text-emerald-600 dark:text-emerald-400" />
+          <span className="flex-1">
+            <b>Salary in?</b> Record it to start the new cycle
+          </span>
+          <ArrowRight className="size-4" />
+        </button>
+      )}
+
+      {/* The salary prompt above covers the "salary not recorded" alert. */}
+      {d && <AlertBanners alerts={d.salary.awaiting ? d.alerts.filter((a) => !a.key.startsWith("salary_missing:")) : d.alerts} />}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="min-w-0 space-y-4 lg:col-span-2">
@@ -68,8 +88,8 @@ export default function HomePage() {
           {isPending ? <Skeleton className="h-48 rounded-xl" /> : <SafeToSpend d={d} />}
           {showPlan && <SalaryPlanCard plan={plan} />}
           {/* Empty charts on a fresh install are just noise. */}
-          {isPending ? <Skeleton className="h-40 rounded-xl" /> : (d.daily.length > 0 || d.cycle.budgetPaise > 0) && <DailyChart d={d} />}
-          {isPending ? <Skeleton className="h-64 rounded-xl" /> : d.byCategory.length > 0 && <ByCategory d={d} />}
+          {isPending ? <Skeleton className="h-40 rounded-xl" /> : (d.daily.some((x) => x.spentPaise > 0) || d.cycle.budgetPaise > 0) && <DailyChart d={d} />}
+          {isPending ? <Skeleton className="h-64 rounded-xl" /> : d.byCategory.some((c) => c.spentPaise > 0 || c.limitPaise) && <ByCategory d={d} />}
         </div>
         <div className="space-y-4">
           <Balances d={d} loading={isPending} />
@@ -94,6 +114,7 @@ export default function HomePage() {
         </div>
       </div>
       <TxnEditor target={editing} onClose={() => setEditing(null)} />
+      <SalarySheet open={salaryOpen} onOpenChange={setSalaryOpen} />
     </div>
   );
 }

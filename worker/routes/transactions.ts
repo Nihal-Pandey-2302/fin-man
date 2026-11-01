@@ -9,6 +9,7 @@ import { accounts, DIRECTIONS, INCOME_SOURCES, smsRaw, transactions, TXN_KINDS, 
 import { unpairGroup } from "../ledger/matcher";
 import { unmatchAutopay } from "../ledger/autopays";
 import { detectSalary, unlinkSalary } from "../ledger/salary";
+import { adoptManualTwin } from "../ledger/twins";
 import { settleNewTransaction } from "../ledger/settle";
 import { applyRuleToUncategorized, learnRule } from "../ledger/rules";
 import { processSms } from "../sms/ingest";
@@ -171,6 +172,14 @@ export const transactionRoutes = new Hono<AppEnv>()
     if (smsId) {
       sms = await db.select().from(smsRaw).where(eq(smsRaw.id, smsId)).get();
       if (!sms) return c.json({ error: "sms_not_found" }, 404);
+      // The money was already entered by hand (e.g. salary): back that entry with this SMS instead.
+      const at = occurredAt ? new Date(occurredAt) : sms.receivedAt;
+      const twin = await adoptManualTwin(db, { accountId: fields.accountId, direction: fields.direction, amountPaise: fields.amountPaise, occurredAt: at, smsId: sms.id });
+      if (twin) {
+        await db.update(smsRaw).set({ parseStatus: "parsed", parser: "manual", error: null }).where(eq(smsRaw.id, sms.id));
+        const row = await db.select().from(transactions).where(eq(transactions.id, twin)).get();
+        return c.json({ ...row, linked: true }, 200);
+      }
     }
     const [row] = await db
       .insert(transactions)

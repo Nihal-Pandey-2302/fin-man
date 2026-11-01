@@ -62,9 +62,15 @@ Read this first if you're resuming after a context reset. Then read CLAUDE.md an
   - Activity is capped at `max-w-3xl` on desktop.
   - List padding in cards aligned with the card titles.
 
+- [x] **Manual salary + manual/SMS twins** (2026-11-01):
+  - The owner has no salary-SMS sample yet, so salary is recorded by hand. Home shows a "Salary in?" prompt from the 25th to the 10th until one is recorded. Plan has a **Salary received** button, and the `/?salary=1` deep link (used by the salary_missing alert and push) opens the sheet.
+  - `worker/ledger/twins.ts` `adoptManualTwin` links a later SMS to a hand-made entry with the same account, direction and amount within ±2 IST days. It's used by ingest and by "create from SMS" in Review. Without it, the salary-plan "Record" transfers and manual salary were double-counted once the SMS arrived.
+  - The owner has **no HDFC debit card**, so no ATM or debit-card formats are needed.
+  - The RuPay (UPI) card SMS uses the same format as the Mastercard one (already in the fixtures).
+
 ## Waiting on the owner
 1. **SMS sender IDs**, exactly as the phone shows them. Then update KNOWN_SENDERS in worker/sms/senders.ts and add a test.
-2. **More SMS samples**: salary NEFT credit, card "payment received", refund, ATM, NACH debit, low-balance. Add a fixture and an expectation for each, then a parser rule.
+2. **More SMS samples**, still useful: card "payment received", the Indian Bank autopay debit itself, and the HDFC→IDFC/Indian transfer if it isn't UPI. The salary SMS is optional now that salary entry is manual. Add a fixture and an expectation for each, then a parser rule.
 3. **Go-ahead to deploy.** Checklist (do NOT run before then):
    - `npx wrangler login`, then `npx wrangler d1 create fintrack` and put the database_id in wrangler.jsonc (or rely on auto-provisioning).
    - `npx wrangler d1 migrations apply DB --remote`

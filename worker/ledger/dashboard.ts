@@ -8,6 +8,8 @@ import { computeBalances } from "./balances";
 import { currentCycle } from "./cycles";
 import { getSetting } from "./settings";
 
+const dayOfMonth = (date: string) => Number(date.slice(8, 10));
+
 /**
  * Spending = expense + fee debits, minus refunds. Transfers, card payments, income and investments
  * (SIPs, stock purchases) never count, so moving money between your own accounts can't double count.
@@ -43,7 +45,7 @@ export async function buildDashboard(db: Db, now = new Date()): Promise<Dashboar
   const to = istDayStart(addDays(cycle.endDate, 1));
   const inCycle = and(gte(transactions.occurredAt, from), lt(transactions.occurredAt, to));
 
-  const [daily, byCategory, limits, dueAutopays, recent, accountRows, buffer, review, lastSms] = await Promise.all([
+  const [daily, byCategory, limits, dueAutopays, recent, accountRows, buffer, review, lastSms, lastSalary] = await Promise.all([
     db
       .select({ date: istDay, spentPaise: sql<number>`SUM(${SPEND})` })
       .from(transactions)
@@ -71,6 +73,13 @@ export async function buildDashboard(db: Db, now = new Date()): Promise<Dashboar
     getSetting(db, "liquid_buffer_paise"),
     reviewCount(db),
     lastSmsAt(db),
+    db
+      .select({ amountPaise: transactions.amountPaise, accountId: transactions.accountId, occurredAt: transactions.occurredAt })
+      .from(transactions)
+      .where(eq(transactions.incomeSource, "salary"))
+      .orderBy(desc(transactions.occurredAt))
+      .limit(1)
+      .get(),
   ]);
 
   const spentPaise = daily.reduce((s, d) => s + d.spentPaise, 0);
@@ -115,6 +124,12 @@ export async function buildDashboard(db: Db, now = new Date()): Promise<Dashboar
     recent: recent.map(serializeTxn),
     reviewCount: review,
     lastSmsAt: lastSms?.toISOString() ?? null,
+    salary: {
+      // Around payday (25th–10th) with nothing marked as salary in the last 20 days: offer to record it.
+      awaiting: (dayOfMonth(today) >= 25 || dayOfMonth(today) <= 10) && (!lastSalary || daysBetween(istDate(lastSalary.occurredAt), today) > 20),
+      lastPaise: lastSalary?.amountPaise ?? null,
+      lastAccountId: lastSalary?.accountId ?? null,
+    },
     alerts,
   };
 }

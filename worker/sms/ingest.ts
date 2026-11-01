@@ -2,6 +2,7 @@ import { and, eq, like } from "drizzle-orm";
 import type { Db } from "../db";
 import { accountNumbers, accounts, smsRaw, transactions } from "../db/schema";
 import { applyAutopayNotice } from "../ledger/autopays";
+import { adoptManualTwin } from "../ledger/twins";
 import { settleNewTransaction } from "../ledger/settle";
 import { bumpRuleHits, findRule, loadRules } from "../ledger/rules";
 import { isOtp, isPromo } from "./classify";
@@ -107,6 +108,14 @@ export async function processSms(db: Db, row: SmsRow): Promise<IngestOutcome> {
   if (existing) {
     await setSmsStatus(db, row.id, "parsed", { parser, parsedJson });
     return { status: "duplicate", smsId: row.id, transactionId: existing.id };
+  }
+
+  // Entered by hand before the SMS arrived (salary, a salary-plan transfer, a quick-add)? Back that entry
+  // with this SMS instead of counting the money twice.
+  const twin = await adoptManualTwin(db, { ...result, accountId: account.id, smsId: row.id });
+  if (twin) {
+    await setSmsStatus(db, row.id, "parsed", { parser, parsedJson });
+    return { status: "duplicate", smsId: row.id, transactionId: twin, reason: "linked_manual" };
   }
 
   const rule = findRule(await loadRules(db), result.counterparty, result.vpa);
