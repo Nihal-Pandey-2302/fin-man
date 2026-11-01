@@ -103,6 +103,10 @@ describe("POST /api/ingest/sms", () => {
     const form = new URLSearchParams({ sender: "JK-HDFCBK-S", body: sms });
     const b = await api("/ingest/sms", { method: "POST", headers: { ...headers, "content-type": "application/x-www-form-urlencoded" }, body: form.toString(), auth: false });
     expect(await b.json()).toMatchObject({ status: "duplicate" });
+    // What the phone actually sends: text/plain, sender on line 1. A new message (different hash) goes through.
+    const plain = `JK-HDFCBK-S\n${sms.replace("520.00", "521.00")}`;
+    const p = await api("/ingest/sms", { method: "POST", headers: { ...headers, "content-type": "text/plain" }, body: plain, auth: false });
+    expect(await p.json()).toMatchObject({ status: "created" });
     // Garbage is still a 400, not a crash.
     const c = await api("/ingest/sms", { method: "POST", headers: { ...headers, "content-type": "application/json" }, body: "{nope", auth: false });
     expect(c.status).toBe(400);

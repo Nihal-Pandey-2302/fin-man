@@ -109,7 +109,8 @@ function SmsStatus() {
 function SmsSetupCard() {
   const [copied, setCopied] = useState<string | null>(null);
   const url = `${location.origin}/api/ingest/sms`;
-  const body = `{"sender":"[sms_number]","body":"[sms_message]","received_at":"[sms_time]"}`;
+  // Plain text, sender on line 1: MacroDroid's magic text can't break it (JSON breaks on quotes, and MacroDroid reads {…} as magic text).
+  const body = "{sms_number}\n{sms_message}";
   const { data: forwarding } = useQuery({ queryKey: ["sms-forwarding"], queryFn: () => api<{ secret: string | null }>("/sms-forwarding"), staleTime: Infinity });
   const secret = forwarding?.secret;
   const copy = async (label: string, text: string) => {
@@ -126,7 +127,7 @@ function SmsSetupCard() {
       <CardHeader>
         <CardTitle>Phone SMS forwarding</CardTitle>
         <CardDescription>
-          MacroDroid: trigger “SMS received” from senders containing <b>IDFCFB</b>, <b>INDBNK</b> or <b>HDFCBK</b> (the AX-/VM-… prefix varies), constraint “text doesn't contain OTP / one time password / verification code”, action HTTP POST.
+          MacroDroid: trigger “SMS received”, Select number with regex <code>.*(IDFCFB|INDBNK|HDFCBK).*</code>, content “Excludes” <code>.*(otp|one time password|verification code).*</code> (regex, case-insensitive). Action HTTP Request: POST, content type <b>text/plain</b>, body = the SMS number magic text, a new line, then the SMS message magic text.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -138,7 +139,7 @@ function SmsSetupCard() {
         ) : (
           <CopyRow label="Header value" value="Bearer <INGEST_SECRET>" copied={copied} onCopy={copy} />
         )}
-        <CopyRow label="JSON body" value={body} copied={copied} onCopy={copy} />
+        <CopyRow label="Body (text/plain)" value={body} shown="{sms_number} ⏎ {sms_message}" copied={copied} onCopy={copy} />
         <p className="text-xs text-muted-foreground">Turn off battery optimisation for MacroDroid and enable retry on network failure. Duplicates are harmless — every SMS is stored once.</p>
       </CardContent>
     </Card>

@@ -35,8 +35,9 @@ const smsSchema = z.object({
 });
 
 /**
- * MacroDroid pastes the SMS text into the body as-is. Accept form fields (sender=…&body=…), which survive any
- * text, or JSON. Raw line breaks and tabs inside JSON strings (multi-line HDFC SMS) are escaped before parsing.
+ * MacroDroid pastes the SMS text into the body as-is (and treats `{…}` as its own magic text), so the phone
+ * sends `text/plain`: the sender on the first line, the SMS on the rest. Nothing in an SMS can break that.
+ * Also accepted: form fields (sender=…&body=…) and JSON, with raw line breaks inside strings escaped first.
  */
 export async function readSmsPayload(req: Request): Promise<unknown> {
   const type = req.headers.get("content-type") ?? "";
@@ -44,6 +45,10 @@ export async function readSmsPayload(req: Request): Promise<unknown> {
     return Object.fromEntries([...(await req.formData()).entries()].filter(([, v]) => typeof v === "string"));
   }
   const text = await req.text();
+  if (type.includes("text/plain")) {
+    const nl = text.indexOf("\n");
+    return nl < 0 ? null : { sender: text.slice(0, nl).trim(), body: text.slice(nl + 1) };
+  }
   try {
     return JSON.parse(text);
   } catch {
