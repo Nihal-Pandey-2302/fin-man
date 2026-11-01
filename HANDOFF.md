@@ -78,7 +78,11 @@ Read this first if you're resuming after a context reset. Then read CLAUDE.md an
    - **No Cloudflare Access**: the Zero Trust signup asks for a card, which the owner declined. Instead there's a password login in the Worker (worker/auth.ts). To rotate the password, edit `.prod-secrets.json` (or `npx wrangler secret put APP_PASSWORD`); that signs out every device.
    - Redeploy: `npm run deploy`. Migrations: `npx wrangler d1 migrations apply DB --remote`. Both need the owner's OK.
    - Adding `database_id` changed the local D1 file name under `.wrangler/state`; the demo data was copied across.
-   - MacroDroid: the HTTP POST from Settings → Phone SMS forwarding, with the bearer secret.
+   - Phone (Xiaomi, HyperOS, Android 16) set up over adb on 2026-11-01. The web app is installed. MacroDroid 6.1.5 has the macro "fintrack SMS forward":
+     - Trigger: SMS Received, Select Number regex `.*(IDFCFB|INDBNK|HDFCBK).*`, content Excludes regex `.*(otp|one time password|verification code).*` (case-insensitive).
+     - Action: HTTP Request POST to /api/ingest/sms, `text/plain` body `{sms_number}` + newline + `{sms_message}`, header `Authorization: Bearer <INGEST_SECRET>`.
+     - Permissions: SMS granted, "pause if unused" off, battery "No restrictions", deviceidle whitelist, HyperOS Autostart on.
+     - MacroDroid treats `{…}` as magic text, which is why the body is plain text and not JSON.
 4. Local D1 currently holds **demo data** (fake fixture accounts). Reset with `rm -rf .wrangler/state && npm run db:migrate`.
 
 ## API notes
