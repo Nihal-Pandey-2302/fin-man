@@ -1,3 +1,4 @@
+import { env } from "cloudflare:test";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { istToUtc } from "../shared/time";
@@ -87,6 +88,24 @@ describe("POST /api/ingest/sms", () => {
     expect(await (await postSms("VM-RANDOM", "Your Zomato order is out for delivery"))
       .json()).toMatchObject({ status: "rejected" });
     expect(await db.select().from(smsRaw)).toHaveLength(1);
+  });
+
+  it("survives how MacroDroid sends multi-line SMS: raw newlines in JSON, or form fields", async () => {
+    await seedAccounts();
+    const sms = fixture("hdfc/upi_debit.txt");
+    expect(sms).toContain("\n");
+    const headers = { Authorization: `Bearer ${env.INGEST_SECRET}` };
+    // Magic text pasted unescaped into a JSON template: invalid JSON, repaired by the endpoint.
+    const raw = `{"sender":"JK-HDFCBK-S","body":"${sms}"}`;
+    const a = await api("/ingest/sms", { method: "POST", headers: { ...headers, "content-type": "application/json" }, body: raw, auth: false });
+    expect(await a.json()).toMatchObject({ status: "created" });
+    // The same SMS as form fields is a duplicate (same hash), proving the text arrived identical.
+    const form = new URLSearchParams({ sender: "JK-HDFCBK-S", body: sms });
+    const b = await api("/ingest/sms", { method: "POST", headers: { ...headers, "content-type": "application/x-www-form-urlencoded" }, body: form.toString(), auth: false });
+    expect(await b.json()).toMatchObject({ status: "duplicate" });
+    // Garbage is still a 400, not a crash.
+    const c = await api("/ingest/sms", { method: "POST", headers: { ...headers, "content-type": "application/json" }, body: "{nope", auth: false });
+    expect(c.status).toBe(400);
   });
 
   it("accepts the owner's real sender IDs, whatever the operator prefix or -S/-T suffix", async () => {

@@ -1,4 +1,3 @@
-import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import { z } from "zod";
 import { ingestSms } from "../sms/ingest";
@@ -35,6 +34,27 @@ const smsSchema = z.object({
   received_at: z.union([z.string(), z.number()]).optional(),
 });
 
+/**
+ * MacroDroid pastes the SMS text into the body as-is. Accept form fields (sender=…&body=…), which survive any
+ * text, or JSON. Raw line breaks and tabs inside JSON strings (multi-line HDFC SMS) are escaped before parsing.
+ */
+export async function readSmsPayload(req: Request): Promise<unknown> {
+  const type = req.headers.get("content-type") ?? "";
+  if (type.includes("application/x-www-form-urlencoded") || type.includes("multipart/form-data")) {
+    return Object.fromEntries([...(await req.formData()).entries()].filter(([, v]) => typeof v === "string"));
+  }
+  const text = await req.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    try {
+      return JSON.parse(text.replace(/\r/g, "\\r").replace(/\n/g, "\\n").replace(/\t/g, "\\t"));
+    } catch {
+      return null;
+    }
+  }
+}
+
 export const ingestRoutes = new Hono<AppEnv>()
   .use(async (c, next) => {
     if (!(await bearerOk(c.req.header("Authorization"), c.env.INGEST_SECRET))) {
@@ -42,8 +62,10 @@ export const ingestRoutes = new Hono<AppEnv>()
     }
     await next();
   })
-  .post("/sms", zValidator("json", smsSchema), async (c) => {
-    const { sender, body, received_at } = c.req.valid("json");
+  .post("/sms", async (c) => {
+    const parsed = smsSchema.safeParse(await readSmsPayload(c.req.raw));
+    if (!parsed.success) return c.json({ error: "invalid_body", issues: parsed.error.issues }, 400);
+    const { sender, body, received_at } = parsed.data;
     const outcome = await ingestSms(c.var.db, { sender, body, receivedAt: parseReceivedAt(received_at) });
     // Always 200 for a well-formed request: retrying a duplicate/ignored/rejected SMS can't help.
     return c.json(outcome);
