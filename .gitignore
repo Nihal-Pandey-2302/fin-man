@@ -13,6 +13,8 @@ coverage/
 .dev.vars
 .dev.vars.*
 !.dev.vars.example
+# Production secrets (uploaded with `wrangler secret bulk`); keep a copy in your password manager.
+.prod-secrets.json
 .env
 .env.*
 

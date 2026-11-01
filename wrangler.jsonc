@@ -16,6 +16,8 @@
 		{
 			"binding": "DB",
 			"database_name": "fintrack",
+			// The deployed database (an identifier, not a secret: using it needs the owner's Cloudflare login).
+			"database_id": "a57d4f67-1608-4201-bff2-a228f3221ac0",
 			"migrations_dir": "migrations"
 		}
 	],
