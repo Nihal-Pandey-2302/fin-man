@@ -87,7 +87,7 @@ Read this first if you're resuming after a context reset. Then read CLAUDE.md an
 3. **Deployed (2026-11-01)** at https://fintrack.np2302.workers.dev (account subdomain `np2302`; D1 `fintrack` in APAC, id in wrangler.jsonc).
    - Secrets: INGEST_SECRET, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, APP_PASSWORD, SESSION_SECRET. Values are in the gitignored `.prod-secrets.json`, uploaded with `npx wrangler secret bulk .prod-secrets.json`. VAPID_SUBJECT is unset until the owner confirms an email; the code falls back to a placeholder.
    - **No Cloudflare Access**: the Zero Trust signup asks for a card, which the owner declined. Instead there's a password login in the Worker (worker/auth.ts). To rotate the password, edit `.prod-secrets.json` (or `npx wrangler secret put APP_PASSWORD`); that signs out every device.
-   - Redeploy: `npm run deploy`. Migrations: `npx wrangler d1 migrations apply DB --remote`. Both need the owner's OK.
+   - Redeploy: `npm run deploy` (builds, applies pending migrations to the live D1, then deploys; a failed migration stops the deploy). Needs the owner's OK.
    - Adding `database_id` changed the local D1 file name under `.wrangler/state`; the demo data was copied across.
    - Phone (Xiaomi, HyperOS, Android 16) set up over adb on 2026-11-01. The web app is installed. MacroDroid 6.1.5 has the macro "fintrack SMS forward":
      - Trigger: SMS Received, Select Number regex `.*(IDFCFB|INDBNK|HDFCBK).*`, content Excludes regex `.*(otp|one time password|verification code).*` (case-insensitive).
