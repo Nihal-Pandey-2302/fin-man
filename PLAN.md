@@ -40,8 +40,8 @@ Browser / installed PWA <──── same Worker (static app + JSON API) ─┤
 | ORM / migrations | **Drizzle ORM** + drizzle-kit | Typed schema, SQL migrations committed to git |
 | Frontend | **Vite + React + TypeScript**, Tailwind v4, shadcn/ui, Recharts | Plain static single-page app, no server-side rendering needed |
 | "App" on Android | **PWA** (vite-plugin-pwa): installable, offline shell, web push for reminders | One codebase for both the website and the phone app |
-| Auth | **Cloudflare Access** in front of the whole app (email one-time PIN or Google, allow only the owner's email) | No auth code to write. If Access is awkward on `workers.dev`, put the app on a cheap domain |
-| SMS ingest auth | Access **bypass** on `/api/ingest/*`, plus a required `Authorization: Bearer <INGEST_SECRET>` (Worker secret) | The phone can't log in through Access |
+| Auth | **Password login in the Worker** (signed HttpOnly session cookie, 180 days; `APP_PASSWORD` + `SESSION_SECRET` secrets) | Cloudflare Access was the plan, but its Zero Trust signup asks for a card, and the owner declined (2026-11-01) |
+| SMS ingest auth | `/api/ingest/*` skips the login and requires `Authorization: Bearer <INGEST_SECRET>` (Worker secret) | The phone posts without a browser session |
 | Tests | **Vitest**; SMS parsers tested against real (redacted) sample messages | Parsers are the riskiest part of the app |
 
 **Data rules:**
@@ -133,7 +133,7 @@ One responsive app, designed **phone-first**: it must be just as good on a phone
 - Dark-first with a light theme, amounts in tabular numerals, ₹ with Indian grouping, and skeletons instead of spinners.
 
 ### Phase 1: daily spending (MVP)
-1. Scaffold: Vite + React + Hono Worker + D1 + Drizzle, deployed with `wrangler`, behind Cloudflare Access.
+1. Scaffold: Vite + React + Hono Worker + D1 + Drizzle, deployed with `wrangler`, behind the owner's password login.
 2. Accounts setup: the four accounts above plus Cash.
 3. SMS ingest endpoint, the four parsers with fixture tests, and the review inbox (swipe to confirm, pick a category).
 4. **Quick add** for cash spends: amount → category → save in 3 taps. Big buttons, works one-handed.
@@ -158,7 +158,7 @@ One responsive app, designed **phone-first**: it must be just as good on a phone
 - Optional native Android companion app (Kotlin) that reads SMS directly and queues them with retries, replacing MacroDroid.
 
 ### Status (2026-11-01)
-- **Phase 1:** done, except deploying behind Cloudflare Access, which waits for the owner's go-ahead. The bank parsers cover the sample formats received so far: HDFC UPI debit/credit, IDFC account credit and UPI debit, IDFC credit card spend, Indian Bank UPI debit/credit, IMPS credit and the autopay heads-up. Still needed: salary NEFT, card "payment received", refund, ATM and NACH samples.
+- **Phase 1:** done. Deployed at https://fintrack.np2302.workers.dev on 2026-11-01, behind a password login. The bank parsers cover the sample formats received so far: HDFC UPI debit/credit, IDFC account credit and UPI debit, IDFC credit card spend, Indian Bank UPI debit/credit, IMPS credit and the autopay heads-up. Still needed: salary NEFT, card "payment received", refund, ATM and NACH samples.
 - **Phase 2:** done. That covers salary detection, the salary-day plan, autopay matching with a calendar and low-balance warning, card reminders (web push + banners) and the cycle report.
 - **Phase 3:** partly done: the holdings page with net worth, JSON and CSV export, and the SMS Backup XML import. Not started: the native Android companion.
 
@@ -173,5 +173,5 @@ One responsive app, designed **phone-first**: it must be just as good on a phone
 - A real HDFC/IDFC/Indian Bank/card SMS on the phone appears as a categorized transaction within about 10 seconds.
 - Transfers between own accounts and card bill payments don't show up as spending.
 - Every parser fixture passes `npm test`.
-- The app is installable on Android from Chrome and protected by Cloudflare Access.
+- The app is installable on Android from Chrome and protected by a login.
 - `npm run backup` produces a local JSON export.

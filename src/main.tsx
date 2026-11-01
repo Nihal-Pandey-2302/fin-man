@@ -1,6 +1,7 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { AuthGate } from "@/components/auth-gate";
 import { ThemeProvider } from "@/components/theme";
 import { Toaster } from "@/components/ui/sonner";
 import { queryClient } from "@/lib/queries";
@@ -15,7 +16,9 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
-        <App />
+        <AuthGate>
+          <App />
+        </AuthGate>
         <Toaster position="top-center" richColors closeButton />
       </QueryClientProvider>
     </ThemeProvider>

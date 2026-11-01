@@ -5,3 +5,7 @@ INGEST_SECRET=dev-ingest-secret
 # VAPID_PUBLIC_KEY=
 # VAPID_PRIVATE_KEY=
 # VAPID_SUBJECT=mailto:you@example.com
+
+# Login. In production both are Worker secrets; changing APP_PASSWORD signs out every device.
+APP_PASSWORD=dev
+SESSION_SECRET=dev-session-secret

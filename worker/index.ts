@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { runDaily } from "./daily";
 import { getDb } from "./db";
 import { accountRoutes } from "./routes/accounts";
+import { authRoutes, requireSession } from "./routes/auth";
 import { categoryRoutes, ruleRoutes } from "./routes/categories";
 import { importRoutes } from "./routes/import";
 import { ingestRoutes } from "./routes/ingest";
@@ -17,6 +18,8 @@ app.use(async (c, next) => {
   c.set("db", getDb(c.env.DB));
   await next();
 });
+// Everything except login, health and SMS ingest needs the owner's session (see worker/auth.ts).
+app.use(requireSession);
 
 app.get("/health", async (c) => {
   const row = await c.env.DB.prepare("select 1 as ok").first<{ ok: number }>();
@@ -24,6 +27,7 @@ app.get("/health", async (c) => {
 });
 
 app
+  .route("/auth", authRoutes)
   .route("/ingest", ingestRoutes)
   .route("/accounts", accountRoutes)
   .route("/categories", categoryRoutes)

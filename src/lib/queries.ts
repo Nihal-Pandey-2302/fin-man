@@ -1,14 +1,26 @@
-import { keepPreviousData, QueryClient, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, QueryCache, QueryClient, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { Autopay, Bootstrap, Category, Cycle, Dashboard, Holding, Loan, Occurrence, Page, Report, Review, Rule, SalaryPlan, Settings, Txn } from "@shared/api";
-import { api, errorMessage } from "./api";
+import { api, ApiError, errorMessage } from "./api";
 
-export const queryClient = new QueryClient({
+export type Session = { configured: boolean; authenticated: boolean };
+
+/** A 401 from any call means the session is gone (expired, or the password changed): show the login screen. */
+const signedOut = (err: unknown) => {
+  if (!(err instanceof ApiError) || err.status !== 401) return false;
+  queryClient.setQueryData<Session>(["session"], (s) => ({ configured: s?.configured ?? true, authenticated: false }));
+  return true;
+};
+
+export const queryClient: QueryClient = new QueryClient({
+  queryCache: new QueryCache({ onError: (err) => void signedOut(err) }),
   defaultOptions: {
-    queries: { staleTime: 30_000, refetchOnWindowFocus: true, retry: 1 },
-    mutations: { onError: (err) => toast.error(errorMessage(err)) },
+    queries: { staleTime: 30_000, refetchOnWindowFocus: true, retry: (n, err) => !(err instanceof ApiError && err.status === 401) && n < 1 },
+    mutations: { onError: (err) => void (signedOut(err) || toast.error(errorMessage(err))) },
   },
 });
+
+export const useSession = () => useQuery({ queryKey: ["session"], queryFn: () => api<Session>("/auth/session"), staleTime: Infinity });
 
 export const keys = {
   bootstrap: ["bootstrap"] as const,

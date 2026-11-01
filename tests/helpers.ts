@@ -1,5 +1,6 @@
 import { env } from "cloudflare:test";
 import { exports } from "cloudflare:workers";
+import { createSession, SESSION_COOKIE } from "../worker/auth";
 import { getDb, schema } from "../worker/db";
 
 export const db = getDb(env.DB);
@@ -12,10 +13,12 @@ export function fixture(path: string): string {
   return body;
 }
 
-export function api(path: string, init: RequestInit & { json?: unknown } = {}) {
-  const { json, ...rest } = init;
+/** Calls the Worker as the logged-in owner; pass `auth: false` to call it anonymously. */
+export async function api(path: string, init: RequestInit & { json?: unknown; auth?: boolean } = {}) {
+  const { json, auth = true, ...rest } = init;
   const headers = new Headers(rest.headers);
   if (json !== undefined) headers.set("content-type", "application/json");
+  if (auth && !headers.has("cookie")) headers.set("cookie", `${SESSION_COOKIE}=${await createSession(env)}`);
   return exports.default.fetch(`http://local/api${path}`, {
     ...rest,
     headers,

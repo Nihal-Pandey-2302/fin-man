@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { Bell, BellOff, Check, Copy, Download, Moon, Plus, Sun, SunMoon, Trash2 } from "lucide-react";
+import { Bell, BellOff, Check, Copy, Download, LogOut, Moon, Plus, Sun, SunMoon, Trash2 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { cn } from "cn";
@@ -13,7 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api, del, errorMessage, patch, post } from "@/lib/api";
-import { invalidateLedger, useDashboard, useLookups } from "@/lib/queries";
+import { invalidateLedger, queryClient, useDashboard, useLookups, type Session } from "@/lib/queries";
 import { relativeTime } from "@/lib/relative";
 import { SubPageHeader } from "./more";
 
@@ -336,6 +336,18 @@ function AppearanceCard() {
             </a>
           </Button>
         </div>
+        <Button
+          variant="ghost"
+          className="text-muted-foreground"
+          onClick={async () => {
+            await post("/auth/logout");
+            // Flip the gate first (it watches the session query), then drop everything cached while signed in.
+            queryClient.setQueryData<Session>(["session"], { configured: true, authenticated: false });
+            queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== "session" });
+          }}
+        >
+          <LogOut /> Sign out of this device
+        </Button>
       </CardContent>
     </Card>
   );

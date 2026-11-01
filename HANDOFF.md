@@ -73,12 +73,11 @@ Read this first if you're resuming after a context reset. Then read CLAUDE.md an
 ## Waiting on the owner
 1. ~~SMS sender IDs~~ received 2026-11-01: IDFCFB (AX-/AD-/CP-), INDBNK (BV-/VM-, -S/-T), HDFCBK (JK-). They're the allowlist in worker/sms/senders.ts. A bank-looking SMS from any other sender is stored as `unknown_sender:<ID>` and waits in Review; it's never auto-parsed and is skipped by bulk reprocess. IDFC also sends a monthly "interest credited" SMS (from AD-IDFCFB-S); there's no sample yet, so it lands in Review.
 2. **More SMS samples**, still useful: card "payment received", the Indian Bank autopay debit itself, and the HDFC→IDFC/Indian transfer if it isn't UPI. The salary SMS is optional now that salary entry is manual. Add a fixture and an expectation for each, then a parser rule.
-3. **Go-ahead to deploy.** Checklist (do NOT run before then):
-   - `npx wrangler login`, then `npx wrangler d1 create fintrack` and put the database_id in wrangler.jsonc (or rely on auto-provisioning).
-   - `npx wrangler d1 migrations apply DB --remote`
-   - Secrets: `npx wrangler secret put INGEST_SECRET` (a long random value), `VAPID_PRIVATE_KEY`. Vars: VAPID_PUBLIC_KEY and VAPID_SUBJECT (the owner's mailto).
-   - Add a `deploy` script (`npm run build && wrangler deploy`), then deploy.
-   - Cloudflare Access: protect the whole hostname (allow only the owner's email) and add a **bypass** policy for `/api/ingest/*`.
+3. **Deployed (2026-11-01)** at https://fintrack.np2302.workers.dev (account subdomain `np2302`; D1 `fintrack` in APAC, id in wrangler.jsonc).
+   - Secrets: INGEST_SECRET, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, APP_PASSWORD, SESSION_SECRET. Values are in the gitignored `.prod-secrets.json`, uploaded with `npx wrangler secret bulk .prod-secrets.json`. VAPID_SUBJECT is unset until the owner confirms an email; the code falls back to a placeholder.
+   - **No Cloudflare Access**: the Zero Trust signup asks for a card, which the owner declined. Instead there's a password login in the Worker (worker/auth.ts). To rotate the password, edit `.prod-secrets.json` (or `npx wrangler secret put APP_PASSWORD`); that signs out every device.
+   - Redeploy: `npm run deploy`. Migrations: `npx wrangler d1 migrations apply DB --remote`. Both need the owner's OK.
+   - Adding `database_id` changed the local D1 file name under `.wrangler/state`; the demo data was copied across.
    - MacroDroid: the HTTP POST from Settings → Phone SMS forwarding, with the bearer secret.
 4. Local D1 currently holds **demo data** (fake fixture accounts). Reset with `rm -rf .wrangler/state && npm run db:migrate`.
 

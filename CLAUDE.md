@@ -11,7 +11,7 @@ This repo used to hold a Next.js + Supabase app ("Finance Terminal"), which is b
 - **DB:** Cloudflare D1 (SQLite). **ORM/migrations:** Drizzle ORM + drizzle-kit, with SQL migrations committed to git.
 - **Frontend:** Vite + React + TypeScript, Tailwind v4, shadcn/ui, Recharts. Plain SPA, no SSR, no Next.js.
 - **PWA:** vite-plugin-pwa (installable on Android, offline shell, web push).
-- **Auth:** Cloudflare Access in front of everything, with no app-level auth code. `/api/ingest/*` bypasses Access and requires `Authorization: Bearer <INGEST_SECRET>` (a Worker secret).
+- **Auth:** a single-owner password login in the Worker (`worker/auth.ts`, `routes/auth.ts`). The owner chose this over Cloudflare Access, which needs a card on file. A login sets a signed HttpOnly, SameSite=Strict cookie for 180 days, keyed on `SESSION_SECRET` + `APP_PASSWORD`, so changing the password signs out every device. Every `/api/*` route except `/api/auth/*`, `/api/health` and `/api/ingest/*` requires it, and it fails closed when a secret is missing. `/api/ingest/*` requires `Authorization: Bearer <INGEST_SECRET>`. After 10 wrong passwords in 15 minutes, logins are locked.
 - **Tests:** Vitest. SMS parsers are tested against real, redacted fixtures in `tests/fixtures/sms/<bank>/*.txt`.
 - **Tooling:** Node 24 + npm, using `npx wrangler` (local devDependency, not a global install).
 
@@ -83,7 +83,7 @@ Both dev servers share the local D1 in `.wrangler/state`. Delete that folder to 
 
 ## Guardrails
 
-- **Do not deploy** (`wrangler deploy`), touch remote D1 (`--remote`), set Worker secrets, or configure Cloudflare Access unless the owner explicitly says so. Local dev (`wrangler dev` + local D1) must work fully offline.
+- **Do not deploy** (`wrangler deploy`), touch remote D1 (`--remote`), or set Worker secrets unless the owner explicitly says so. Local dev (`wrangler dev` + local D1) must work fully offline.
 - Never commit secrets (`.dev.vars`, `.env*`) or unredacted SMS (real names, full account numbers, balances tied to identity). Fixtures must be redacted.
 - OTPs must never leave the phone. Treat any OTP that reaches the server as a bug: store it as `ignored`.
 - Schema changes go through drizzle-kit migrations. Never hand-edit an applied migration.
