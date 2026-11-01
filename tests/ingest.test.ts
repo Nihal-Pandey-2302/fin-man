@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { istToUtc } from "../shared/time";
 import { parseReceivedAt } from "../worker/routes/ingest";
 import { setSetting } from "../worker/ledger/settings";
+import { reprocessUnparsed } from "../worker/sms/ingest";
+import { normalizeSender } from "../worker/sms/normalize";
+import { isKnownSender } from "../worker/sms/senders";
 import { api, db, fixture, postSms, resetLedger, schema, seedAccounts } from "./helpers";
 
 const { smsRaw, transactions, categories } = schema;
@@ -84,6 +87,29 @@ describe("POST /api/ingest/sms", () => {
     expect(await (await postSms("VM-RANDOM", "Your Zomato order is out for delivery"))
       .json()).toMatchObject({ status: "rejected" });
     expect(await db.select().from(smsRaw)).toHaveLength(1);
+  });
+
+  it("accepts the owner's real sender IDs, whatever the operator prefix or -S/-T suffix", async () => {
+    for (const raw of ["AX-IDFCFB-S", "AD-IDFCFB-S", "CP-IDFCFB-S", "BV-INDBNK-S", "VM-INDBNK-S", "VM-INDBNK-T", "JK-HDFCBK-S"]) {
+      expect(isKnownSender(normalizeSender(raw)), raw).toBe(true);
+    }
+    expect(isKnownSender(normalizeSender("VM-HDFCBN-S"))).toBe(false);
+  });
+
+  it("parks bank-looking SMS from unknown senders in review, never parsing them on its own", async () => {
+    await seedAccounts();
+    // A real format from a sender that isn't on the list (a new sender ID, or a scam copying the text).
+    const out = await (await postSms("VM-HDFCBN-S", fixture("hdfc/upi_debit.txt"))).json();
+    expect(out).toMatchObject({ status: "unparsed", reason: "unknown_sender" });
+    expect(await db.select().from(transactions)).toHaveLength(0);
+    const [row] = await db.select().from(smsRaw);
+    expect(row.error).toBe("unknown_sender:HDFCBN");
+
+    // Adding an account reprocesses unparsed SMS in bulk; this one must still wait for the owner.
+    expect(await reprocessUnparsed(db)).toBe(0);
+    // The owner's Retry reads it.
+    const retried = await (await api(`/review/sms/${row.id}/reprocess`, { method: "POST" })).json();
+    expect(retried).toMatchObject({ status: "created" });
   });
 
   it("keeps autopay heads-up notices structured, without creating a transaction", async () => {

@@ -71,7 +71,7 @@ Read this first if you're resuming after a context reset. Then read CLAUDE.md an
   - The RuPay (UPI) card SMS uses the same format as the Mastercard one (already in the fixtures).
 
 ## Waiting on the owner
-1. **SMS sender IDs**, exactly as the phone shows them. Then update KNOWN_SENDERS in worker/sms/senders.ts and add a test.
+1. ~~SMS sender IDs~~ received 2026-11-01: IDFCFB (AX-/AD-/CP-), INDBNK (BV-/VM-, -S/-T), HDFCBK (JK-). They're the allowlist in worker/sms/senders.ts. A bank-looking SMS from any other sender is stored as `unknown_sender:<ID>` and waits in Review; it's never auto-parsed and is skipped by bulk reprocess. IDFC also sends a monthly "interest credited" SMS (from AD-IDFCFB-S); there's no sample yet, so it lands in Review.
 2. **More SMS samples**, still useful: card "payment received", the Indian Bank autopay debit itself, and the HDFC→IDFC/Indian transfer if it isn't UPI. The salary SMS is optional now that salary entry is manual. Add a fixture and an expectation for each, then a parser rule.
 3. **Go-ahead to deploy.** Checklist (do NOT run before then):
    - `npx wrangler login`, then `npx wrangler d1 create fintrack` and put the database_id in wrangler.jsonc (or rely on auto-provisioning).

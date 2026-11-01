@@ -1,4 +1,4 @@
-import { and, eq, like } from "drizzle-orm";
+import { and, eq, isNull, like, notLike, or } from "drizzle-orm";
 import type { Db } from "../db";
 import { accountNumbers, accounts, smsRaw, transactions } from "../db/schema";
 import { applyAutopayNotice } from "../ledger/autopays";
@@ -8,7 +8,7 @@ import { bumpRuleHits, findRule, loadRules } from "../ledger/rules";
 import { isOtp, isPromo } from "./classify";
 import { normalizeBody, normalizeSender, smsHash } from "./normalize";
 import { parseSms, type ParsedTxn } from "./parsers";
-import { isBankSms } from "./senders";
+import { isKnownSender, looksLikeBank } from "./senders";
 
 export type IngestInput = { sender: string; body: string; receivedAt: Date };
 
@@ -26,7 +26,8 @@ export async function ingestSms(db: Db, input: IngestInput): Promise<IngestOutco
   const body = normalizeBody(input.body);
   const hash = await smsHash(sender, body);
 
-  if (!isBankSms(sender, body)) return { status: "rejected", reason: "unknown_sender" };
+  const known = isKnownSender(sender);
+  if (!known && !looksLikeBank(body)) return { status: "rejected", reason: "unknown_sender" };
   const otp = isOtp(body);
 
   const [row] = await db
@@ -39,7 +40,7 @@ export async function ingestSms(db: Db, input: IngestInput): Promise<IngestOutco
       receivedAt: input.receivedAt,
       hash,
       parseStatus: otp ? "ignored" : "unparsed",
-      error: otp ? "otp" : null,
+      error: otp ? "otp" : known ? null : `unknown_sender:${sender}`.slice(0, 80),
     })
     .onConflictDoNothing({ target: smsRaw.hash })
     .returning();
@@ -49,6 +50,8 @@ export async function ingestSms(db: Db, input: IngestInput): Promise<IngestOutco
     return { status: "duplicate", smsId: existing?.id };
   }
   if (otp) return { status: "ignored", smsId: row.id, reason: "otp" };
+  // Not from a known bank sender: the owner decides in the review inbox (Retry reads it anyway).
+  if (!known) return { status: "unparsed", smsId: row.id, reason: "unknown_sender" };
   return processSms(db, row);
 }
 
@@ -60,7 +63,8 @@ export async function reprocessUnparsed(db: Db, onlyMissingAccount = false): Pro
     .where(
       onlyMissingAccount
         ? and(eq(smsRaw.parseStatus, "unparsed"), like(smsRaw.error, "no_account:%"))
-        : eq(smsRaw.parseStatus, "unparsed"),
+        : // Unknown senders wait for the owner's Retry; bulk reprocessing never reads them.
+          and(eq(smsRaw.parseStatus, "unparsed"), or(isNull(smsRaw.error), notLike(smsRaw.error, "unknown_sender:%"))),
     )
     .all();
   let created = 0;

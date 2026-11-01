@@ -123,7 +123,9 @@ function SmsSetupCard() {
     <Card>
       <CardHeader>
         <CardTitle>Phone SMS forwarding</CardTitle>
-        <CardDescription>MacroDroid: trigger “SMS received” from your bank senders, constraint “text doesn't contain OTP / one time password / verification code”, action HTTP POST.</CardDescription>
+        <CardDescription>
+          MacroDroid: trigger “SMS received” from senders containing <b>IDFCFB</b>, <b>INDBNK</b> or <b>HDFCBK</b> (the AX-/VM-… prefix varies), constraint “text doesn't contain OTP / one time password / verification code”, action HTTP POST.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <SmsStatus />

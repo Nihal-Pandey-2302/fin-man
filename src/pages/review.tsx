@@ -225,6 +225,10 @@ function SmsCard({ sms, onCreate }: { sms: Sms; onCreate: () => void }) {
               </Link>{" "}
               and this imports automatically.
             </>
+          ) : sms.error?.startsWith("unknown_sender:") ? (
+            <>
+              Mentions your bank but came from <b>{sms.sender}</b>, which isn't one of your bank senders. If it's genuine, Retry reads it; if it looks like a scam, dismiss it.
+            </>
           ) : (
             "This format isn't recognised yet."
           )}
