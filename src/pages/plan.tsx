@@ -235,7 +235,7 @@ function AutopaysCard() {
         {!!data?.length && (
           <div className="mb-2 grid w-fit grid-cols-2 gap-1 rounded-lg bg-muted p-1 text-sm">
             {(["calendar", "list"] as const).map((v) => (
-              <button key={v} type="button" onClick={() => setView(v)} className={cn("h-8 rounded-md px-3", view === v ? "bg-card font-medium shadow-sm" : "text-muted-foreground")}>
+              <button key={v} type="button" onClick={() => setView(v)} className={cn("h-8 pointer-coarse:h-10 rounded-md px-3", view === v ? "bg-card font-medium shadow-sm" : "text-muted-foreground")}>
                 {v === "calendar" ? "This cycle" : "All"}
               </button>
             ))}
@@ -492,7 +492,7 @@ function LoansCard() {
           const left = l.principalPaise - l.paidPaise;
           return (
             <div key={l.id} className={cn("space-y-2 rounded-lg border p-3", l.status === "settled" && "opacity-60")}>
-              <button type="button" onClick={() => setEditing(l)} className="flex w-full items-start gap-2 text-left">
+              <button type="button" onClick={() => setEditing(l)} className="-my-1 flex w-full items-start gap-2 py-1 text-left">
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium">{l.person}</span>
                   <span className="block truncate text-xs text-muted-foreground">

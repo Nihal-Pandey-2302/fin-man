@@ -3,6 +3,7 @@ import { ArrowLeftRight, Check, MessageSquareWarning, Pencil, RotateCw, X } from
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
+import { haptic } from "@/lib/haptic";
 import type { Review, Sms, Txn } from "@shared/api";
 import { formatDay, formatTime } from "@shared/time";
 import { CategoryBadge, CategoryPicker } from "@/components/category-picker";
@@ -42,6 +43,7 @@ export default function ReviewPage() {
 
   /** Optimistically drop items from the inbox, then confirm on the server. */
   async function confirm(ids: number[], categoryId?: number | null) {
+    haptic();
     qc.setQueryData<Review>(keys.review, (r) => r && { ...r, transactions: r.transactions.filter((t) => !ids.includes(t.id)) });
     try {
       const results = await Promise.all(ids.map((id) => post<{ appliedTo: number }>(`/transactions/${id}/confirm`, categoryId !== undefined ? { categoryId } : {})));
@@ -139,11 +141,11 @@ function ReviewCard({ txn, onConfirm, onEdit, onPick }: { txn: Txn; onConfirm: (
           </div>
           <div className="flex flex-wrap gap-2">
             {suggestions.map((c) => (
-              <Button key={c!.id} variant={c!.id === txn.categoryId ? "default" : "secondary"} size="sm" className="h-9 rounded-full" onClick={() => onConfirm(c!.id)}>
+              <Button key={c!.id} variant={c!.id === txn.categoryId ? "default" : "secondary"} size="sm" className="h-9 rounded-full pointer-coarse:h-10" onClick={() => onConfirm(c!.id)}>
                 {c!.emoji} {c!.name}
               </Button>
             ))}
-            <Button variant="ghost" size="sm" className="h-9 rounded-full" onClick={onPick}>
+            <Button variant="ghost" size="sm" className="h-9 rounded-full pointer-coarse:h-10" onClick={onPick}>
               More…
             </Button>
           </div>
@@ -151,7 +153,7 @@ function ReviewCard({ txn, onConfirm, onEdit, onPick }: { txn: Txn; onConfirm: (
             <Button variant="ghost" size="sm" onClick={onEdit}>
               <Pencil /> Edit
             </Button>
-            <Button size="sm" className="ml-auto h-9" onClick={() => onConfirm()}>
+            <Button size="sm" className="ml-auto h-9 pointer-coarse:h-10" onClick={() => onConfirm()}>
               <Check /> {cat ? `Confirm · ${cat.name}` : credit ? "Confirm" : "Pick category"}
             </Button>
           </div>

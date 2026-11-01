@@ -414,7 +414,7 @@ function AppearanceCard() {
               key={value}
               type="button"
               onClick={() => setTheme(value)}
-              className={`flex h-9 items-center justify-center gap-2 rounded-md text-sm ${theme === value ? "bg-card font-medium shadow-sm" : "text-muted-foreground"}`}
+              className={`flex h-9 pointer-coarse:h-10 items-center justify-center gap-2 rounded-md text-sm ${theme === value ? "bg-card font-medium shadow-sm" : "text-muted-foreground"}`}
             >
               <Icon className="size-4" /> {label}
             </button>

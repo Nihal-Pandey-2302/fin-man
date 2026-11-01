@@ -29,7 +29,7 @@ export default function ReportPage() {
         action={
           r && (
             <div className="w-48">
-              <NativeSelect aria-label="Period" value={r.startDate} onChange={(e) => setStart(e.target.value)} className="h-9 text-sm">
+              <NativeSelect aria-label="Period" value={r.startDate} onChange={(e) => setStart(e.target.value)} className="h-9 text-sm pointer-coarse:h-11">
                 {r.periods.map((p) => (
                   <option key={p.startDate} value={p.startDate}>
                     {formatShortDate(p.startDate)} – {formatShortDate(p.endDate)}
@@ -53,7 +53,7 @@ export default function ReportPage() {
             <CardContent className="space-y-2">
               {r.topMerchants.length === 0 && <p className="text-sm text-muted-foreground">No merchant spends.</p>}
               {r.topMerchants.map((m, i) => (
-                <Link key={m.merchant} to={merchantPath(m.merchant)} className="-mx-2 flex items-center gap-3 rounded-md px-2 py-1 text-sm hover:bg-muted/60">
+                <Link key={m.merchant} to={merchantPath(m.merchant)} className="-mx-2 flex items-center gap-3 rounded-md px-2 py-1 text-sm hover:bg-muted/60 pointer-coarse:py-2.5">
                   <span className="w-5 text-muted-foreground tabular-nums">{i + 1}</span>
                   <span className="flex-1 truncate">{m.merchant}</span>
                   <span className="text-xs text-muted-foreground">{m.count}×</span>

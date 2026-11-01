@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { post } from "@/lib/api";
+import { haptic } from "@/lib/haptic";
 import { paiseToInput } from "@/lib/format";
 import { useDashboard, useLedgerMutation, useLookups } from "@/lib/queries";
 
@@ -61,7 +62,12 @@ function SalaryForm({ d, onDone }: { d: Dashboard; onDone: () => void }) {
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (!amountPaise || !accountId || !date) return;
-    save.mutate(undefined, { onSuccess: onDone });
+    save.mutate(undefined, {
+      onSuccess: () => {
+        haptic();
+        onDone();
+      },
+    });
   };
 
   return (

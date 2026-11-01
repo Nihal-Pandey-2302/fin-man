@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { post, put } from "@/lib/api";
+import { haptic } from "@/lib/haptic";
 import { paiseToInput } from "@/lib/format";
 import { useLedgerMutation, useLookups } from "@/lib/queries";
 
@@ -34,9 +35,9 @@ export function CardBill({ status: s }: { status: CardStatus }) {
           <CreditCard className="size-4" />
           <span className="flex-1 truncate">{card.name}</span>
           {s.statementDate && s.status !== "unknown" && (
-            <button type="button" onClick={() => setEditing(true)} className="text-xs underline-offset-2 hover:underline">
+            <Button type="button" variant="ghost" size="sm" className="-my-1 -mr-2 text-xs text-muted-foreground" onClick={() => setEditing(true)}>
               Edit statement
-            </button>
+            </Button>
           )}
         </div>
 
@@ -156,7 +157,7 @@ function MarkPaid({ s }: { s: CardStatus }) {
   );
   if (!from) return null;
   return (
-    <Button size="sm" variant="outline" disabled={pay.isPending} onClick={() => pay.mutate(undefined)}>
+    <Button size="sm" variant="outline" disabled={pay.isPending} onClick={() => pay.mutate(undefined, { onSuccess: () => haptic() })}>
       I've paid it from {from.name}
     </Button>
   );

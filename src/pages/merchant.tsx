@@ -28,7 +28,7 @@ export default function MerchantPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-4">
       <header className="flex items-center gap-2">
-        <button type="button" onClick={() => (history.length > 1 ? navigate(-1) : navigate("/activity"))} className="-ml-2 rounded-md p-2 text-muted-foreground hover:bg-muted" aria-label="Back">
+        <button type="button" onClick={() => (history.length > 1 ? navigate(-1) : navigate("/activity"))} className="-ml-2 rounded-md p-2 pointer-coarse:p-2.5 text-muted-foreground hover:bg-muted" aria-label="Back">
           <ChevronRight className="size-5 rotate-180" />
         </button>
         <h1 className="min-w-0 flex-1 truncate font-heading text-2xl font-semibold">{m?.name ?? (isPending ? "" : "Merchant")}</h1>

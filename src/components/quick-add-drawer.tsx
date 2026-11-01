@@ -1,6 +1,7 @@
 import { Delete, StickyNote } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
+import { haptic } from "@/lib/haptic";
 import type { Category, Preset } from "@shared/api";
 import { formatPaise, rupeesToPaise } from "@shared/money";
 import { CategoryPicker } from "@/components/category-picker";
@@ -88,6 +89,7 @@ function QuickAdd({ onDone }: { onDone: () => void }) {
       }
       save("quickAccount", account);
       invalidateLedger();
+      haptic();
       toast.success(`${formatPaise(amountPaise)} · ${category?.name ?? "Uncategorised"}`, {
         action: { label: "Undo", onClick: () => void del(`/transactions/${txn.id}`).then(() => invalidateLedger()) },
       });

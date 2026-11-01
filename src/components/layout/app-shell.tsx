@@ -1,11 +1,13 @@
-import { Plus, Wallet } from "lucide-react";
-import { Suspense, useEffect, useState } from "react";
+import { CloudOff, Plus, RotateCw, Wallet } from "lucide-react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate, useSearchParams } from "react-router";
 import { cn } from "cn";
 import { QuickAddDrawer } from "@/components/quick-add-drawer";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useBootstrap } from "@/lib/queries";
+import { useOnline } from "@/hooks/use-online";
+import { usePullToRefresh } from "@/hooks/use-pull-to-refresh";
+import { queryClient, useBootstrap } from "@/lib/queries";
 import { NAV_ITEMS, SIDEBAR_EXTRA, type NavItem } from "./nav-items";
 
 export function AppShell() {
@@ -16,6 +18,9 @@ export function AppShell() {
   const { pathname, hash } = useLocation();
   const [params] = useSearchParams();
   const navigate = useNavigate();
+  const online = useOnline();
+  const refresh = useCallback(() => queryClient.refetchQueries({ type: "active" }), []);
+  const { pull, refreshing, ready } = usePullToRefresh(refresh);
 
   useEffect(() => {
     if (params.has("add")) navigate(pathname, { replace: true });
@@ -82,7 +87,20 @@ export function AppShell() {
         ))}
       </aside>
 
+      {/* Pull-to-refresh indicator: follows the finger, spins while refreshing. */}
+      {(pull > 0 || refreshing) && (
+        <div className="pointer-events-none fixed inset-x-0 top-0 z-50 flex justify-center" style={{ transform: `translateY(${refreshing ? 56 : pull}px)` }} aria-hidden>
+          <span className={cn("flex size-9 items-center justify-center rounded-full border bg-card shadow-md transition-colors", (ready || refreshing) && "text-primary")}>
+            <RotateCw className={cn("size-4", refreshing && "animate-spin")} style={refreshing ? undefined : { transform: `rotate(${pull * 3}deg)` }} />
+          </span>
+        </div>
+      )}
       <main className="mx-auto w-full max-w-6xl px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-28 lg:px-8 lg:py-8">
+        {!online && (
+          <p className="mb-3 flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground" role="status">
+            <CloudOff className="size-4" /> Offline: showing saved data. Changes need a connection.
+          </p>
+        )}
         <Suspense fallback={<Skeleton className="h-64 rounded-xl" />}>
           <Outlet />
         </Suspense>

@@ -53,7 +53,7 @@ export function GoalsCard() {
         )}
         {active.map((g) => (
           <div key={g.id} className="space-y-2 rounded-lg border p-3">
-            <button type="button" onClick={() => setSheet({ kind: "goal", goal: g })} className="flex w-full items-baseline justify-between gap-2 text-left">
+            <button type="button" onClick={() => setSheet({ kind: "goal", goal: g })} className="-my-2.5 flex w-full items-baseline justify-between gap-2 py-2.5 text-left">
               <span className="truncate font-medium">{g.name}</span>
               <span className="shrink-0 text-sm tabular-nums">
                 {formatPaise(g.savedPaise)} <span className="text-muted-foreground">/ {formatPaise(g.targetPaise)}</span>

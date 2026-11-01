@@ -48,8 +48,11 @@ export function invalidateLedger(qc = queryClient) {
   }
 }
 
-export const useBootstrap = () => useQuery({ queryKey: keys.bootstrap, queryFn: () => api<Bootstrap>("/bootstrap") });
-export const useDashboard = () => useQuery({ queryKey: keys.dashboard, queryFn: () => api<Dashboard>("/dashboard") });
+// Home and the review badge keep themselves current while the app is open (SMS payments arrive any time);
+// React Query pauses this in the background.
+const LIVE = 60_000;
+export const useBootstrap = () => useQuery({ queryKey: keys.bootstrap, queryFn: () => api<Bootstrap>("/bootstrap"), refetchInterval: LIVE });
+export const useDashboard = () => useQuery({ queryKey: keys.dashboard, queryFn: () => api<Dashboard>("/dashboard"), refetchInterval: LIVE });
 export const useReview = () => useQuery({ queryKey: keys.review, queryFn: () => api<Review>("/review") });
 export const useRules = () => useQuery({ queryKey: keys.rules, queryFn: () => api<Rule[]>("/rules") });
 export const useCycles = () => useQuery({ queryKey: keys.cycles, queryFn: () => api<(Cycle & { budgets: { categoryId: number; limitPaise: number }[] })[]>("/cycles") });

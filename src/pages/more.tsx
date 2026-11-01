@@ -33,7 +33,7 @@ export default function MorePage() {
 export function SubPageHeader({ title, back = "/more", action }: { title: string; back?: string; action?: React.ReactNode }) {
   return (
     <header className="flex items-center gap-2">
-      <Link to={back} className="-ml-2 rounded-md p-2 text-muted-foreground hover:bg-muted lg:hidden" aria-label="Back">
+      <Link to={back} className="-ml-2 rounded-md p-2 pointer-coarse:p-2.5 text-muted-foreground hover:bg-muted lg:hidden" aria-label="Back">
         <ChevronRight className="size-5 rotate-180" />
       </Link>
       <h1 className="flex-1 font-heading text-2xl font-semibold">{title}</h1>
