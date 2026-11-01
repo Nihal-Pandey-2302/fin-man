@@ -75,7 +75,12 @@ Read this first if you're resuming after a context reset. Then read CLAUDE.md an
    - Alerts: card_due (≤3 days), card_overdue, card_util ≥30%. card_util is `quiet` (Home only) except on statement day.
    - The salary plan's card_bill uses the amount left to pay.
    - Home `CardBill` tile has "Enter statement" and "I've paid it from HDFC" (POST /transfers reuses the SMS debit). PUT /api/cards/:id/statement. Migration 0005.
-2. [ ] Pay yourself first: a savings step in the salary plan, savings rate and emergency-fund months on Home, goals and set-asides excluded from safe-to-spend.
+2. [x] **Pay yourself first**:
+   - Settings `savings_target_paise` and `savings_account_id` (optional). The salary plan gets a "savings" step when that account is set, else reports the savings target and goal set-asides kept in the salary account.
+   - `ledger/savings.ts` `buildSavings` (GET /api/savings): this cycle's income, spend, saved and projection against the target, past cycles, and emergency-fund months. Liquid money means bank + cash + FDs not under lien, minus goal set-asides; spending is the average of real past cycles (income and spend), else the budget.
+   - `goals` table (migration 0006) with /api/goals CRUD and /:id/set-aside. Earmarked money stays in the bank.
+   - UI: Home `SavingsCard`, Plan `GoalsCard` (#savings anchor; the shell scrolls to hashes), salary-plan footer.
+   - Backups: a test now fails if any table is missing from /api/export or scripts/backup.mjs.
 3. [ ] Categorise from the push notification: an action button with the top category guesses.
 4. [ ] Subscription/recurring finder: suggest autopays, monthly subscriptions total.
 5. [ ] Automatic weekly backups to R2 (cron), keeping 12.

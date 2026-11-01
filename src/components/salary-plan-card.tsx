@@ -28,6 +28,8 @@ export function SalaryPlanCard({ plan }: { plan: SalaryPlan }) {
     }
   };
   if (!salary || plan.items.length === 0) return null;
+  // Kept in the salary account on purpose: the savings target (no savings account) and goal set-asides.
+  const reserved = plan.savingsTargetPaise + plan.goalsMonthlyPaise;
   return (
     <Card>
       <CardHeader>
@@ -59,9 +61,18 @@ export function SalaryPlanCard({ plan }: { plan: SalaryPlan }) {
             )}
           </div>
         ))}
-        <div className="flex justify-between border-t pt-3 text-sm">
-          <span className="text-muted-foreground">Stays in {salary.name}</span>
-          <span className={plan.keepPaise < 0 ? "font-semibold text-destructive tabular-nums" : "font-semibold tabular-nums"}>{formatPaise(plan.keepPaise)}</span>
+        <div className="space-y-1 border-t pt-3 text-sm">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Stays in {salary.name}</span>
+            <span className={plan.keepPaise < 0 ? "font-semibold text-destructive tabular-nums" : "font-semibold tabular-nums"}>{formatPaise(plan.keepPaise)}</span>
+          </div>
+          {reserved > 0 && (
+            <p className={plan.keepPaise < reserved ? "text-xs text-amber-600 dark:text-amber-400" : "text-xs text-muted-foreground"}>
+              {plan.keepPaise < reserved ? "Not enough for " : "Includes "}
+              {[plan.savingsTargetPaise && `${formatPaise(plan.savingsTargetPaise)} savings`, plan.goalsMonthlyPaise && `${formatPaise(plan.goalsMonthlyPaise)} for goals`].filter(Boolean).join(" and ")}
+              {plan.keepPaise < reserved && ` (${formatPaise(reserved - Math.max(0, plan.keepPaise))} short)`}
+            </p>
+          )}
         </div>
       </CardContent>
     </Card>

@@ -2,12 +2,13 @@ import { and, eq, gte, inArray } from "drizzle-orm";
 import type { SalaryPlan } from "../../shared/api";
 import { addDays, istDate, istDayStart } from "../../shared/time";
 import type { Db } from "../db";
-import { accounts, budgetCycles, transactions } from "../db/schema";
+import { accounts, budgetCycles, goals, transactions } from "../db/schema";
 import { autopayCalendar } from "./autopays";
 import { computeBalances } from "./balances";
 import { cardStatus } from "./cards";
 import { currentCycle } from "./cycles";
 import { spentBetween } from "./dashboard";
+import { goalMonthlyNeed } from "./savings";
 import { getSetting } from "./settings";
 
 /**
@@ -31,7 +32,12 @@ export async function buildSalaryPlan(db: Db, today = istDate()): Promise<Salary
   const unpaid = occurrences.filter((o) => o.status !== "paid");
   const dueFromAutopay = unpaid.filter((o) => o.accountId === autopay?.id).reduce((s, o) => s + o.amountPaise, 0);
   const nonSipDue = unpaid.filter((o) => o.kind !== "sip").reduce((s, o) => s + o.amountPaise, 0);
-  const autopayBuffer = await getSetting(db, "autopay_buffer_paise");
+  const [autopayBuffer, savingsTarget, savingsAccountId, goalRows] = await Promise.all([
+    getSetting(db, "autopay_buffer_paise"),
+    getSetting(db, "savings_target_paise"),
+    getSetting(db, "savings_account_id"),
+    db.select().from(goals).where(eq(goals.archived, false)).all(),
+  ]);
 
   // Money already moved out of the salary account this cycle, per destination (shown for context).
   const legs = salary
@@ -61,6 +67,9 @@ export async function buildSalaryPlan(db: Db, today = istDate()): Promise<Salary
   }
   if (spending) add("spending", "Daily spending money", spending.id, cycle.budgetPaise - spentSoFar - nonSipDue - bal(spending.id));
   if (autopay) add("autopays", "Autopays due this cycle + buffer", autopay.id, dueFromAutopay + autopayBuffer - bal(autopay.id));
+  // Pay yourself first: moved to the savings account if there is one, else kept in the salary account.
+  const savingsAccount = accountRows.find((a) => a.id === savingsAccountId && a.id !== salary?.id);
+  if (savingsAccount && savingsTarget > 0) add("savings", "Savings", savingsAccount.id, savingsTarget - sentTo(savingsAccount.id));
 
   return {
     cycleStart: cycle.startDate,
@@ -70,5 +79,8 @@ export async function buildSalaryPlan(db: Db, today = istDate()): Promise<Salary
     salaryAccountId: salary?.id ?? null,
     items,
     keepPaise: bal(salary?.id) - items.reduce((sum, i) => sum + i.needPaise, 0),
+    // Kept in the salary account on purpose: savings (when there's no savings account) and goal set-asides.
+    savingsTargetPaise: savingsAccount ? 0 : savingsTarget,
+    goalsMonthlyPaise: goalRows.reduce((s, g) => s + goalMonthlyNeed(g, today), 0),
   };
 }

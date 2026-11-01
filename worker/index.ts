@@ -8,7 +8,7 @@ import { categoryRoutes, ruleRoutes } from "./routes/categories";
 import { importRoutes } from "./routes/import";
 import { ingestRoutes } from "./routes/ingest";
 import { miscRoutes } from "./routes/misc";
-import { autopayRoutes, cycleRoutes, holdingRoutes, loanRoutes, presetRoutes } from "./routes/plan";
+import { autopayRoutes, cycleRoutes, goalRoutes, holdingRoutes, loanRoutes, presetRoutes } from "./routes/plan";
 import { pushRoutes } from "./routes/push";
 import { reviewRoutes, transactionRoutes, transferRoutes } from "./routes/transactions";
 import type { AppEnv } from "./types";
@@ -41,6 +41,7 @@ app
   .route("/autopays", autopayRoutes)
   .route("/presets", presetRoutes)
   .route("/loans", loanRoutes)
+  .route("/goals", goalRoutes)
   .route("/holdings", holdingRoutes)
   .route("/push", pushRoutes)
   .route("/import", importRoutes)

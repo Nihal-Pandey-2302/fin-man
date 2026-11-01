@@ -402,6 +402,28 @@ export const cardStatements = sqliteTable(
   ],
 );
 
+/**
+ * Savings goals / set-asides for irregular costs (a trip, insurance, a gadget). Money set aside stays in the
+ * bank: `savedPaise` is earmarked, not moved, so it isn't counted as free to spend.
+ */
+export const goals = sqliteTable(
+  "goals",
+  {
+    id: id(),
+    name: text().notNull(),
+    targetPaise: integer().notNull(),
+    savedPaise: integer().notNull().default(0),
+    /** Optional deadline (YYYY-MM-DD IST): the monthly set-aside is what's left ÷ months to go. */
+    dueOn: text(),
+    /** Optional fixed monthly set-aside, used instead of the deadline split. */
+    monthlyPaise: integer(),
+    archived: bool().default(false),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [check("goals_target_pos", sql`${t.targetPaise} > 0`), check("goals_saved_nonneg", sql`${t.savedPaise} >= 0`)],
+);
+
 /** Browser push subscriptions (one per installed device/browser). */
 export const pushSubscriptions = sqliteTable(
   "push_subscriptions",

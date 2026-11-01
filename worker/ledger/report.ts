@@ -9,7 +9,7 @@ import { serializeTxn, SPEND } from "./dashboard";
 type Period = { startDate: string; endDate: string };
 
 /** Cycles (newest first), with gaps before the first cycle filled by calendar months. */
-async function periods(db: Db, today: string): Promise<Period[]> {
+export async function periods(db: Db, today: string): Promise<Period[]> {
   const rows = await db.select().from(budgetCycles).orderBy(desc(budgetCycles.startDate)).limit(24).all();
   const current = await currentCycle(db, today);
   const out: Period[] = [{ startDate: current.startDate, endDate: current.endDate }];

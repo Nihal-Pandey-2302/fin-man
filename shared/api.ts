@@ -6,6 +6,7 @@ import type {
   autopays,
   budgetCycles,
   categories,
+  goals,
   holdings,
   loanPayments,
   loans,
@@ -69,12 +70,49 @@ export type CardStatus = {
   utilization: number | null;
 };
 
+export type Goal = Jsonify<typeof goals.$inferSelect> & {
+  /** Set aside per month to reach the target in time (fixed monthly amount, or what's left ÷ months to go). */
+  monthlyNeedPaise: number;
+};
+
+export type Savings = {
+  cycle: {
+    startDate: string;
+    endDate: string;
+    incomePaise: number;
+    spentPaise: number;
+    investedPaise: number;
+    budgetPaise: number;
+    /** Income − spending so far. */
+    savedSoFarPaise: number;
+    /** Income − the larger of budget and spending: what's saved if the budget holds. */
+    projectedPaise: number;
+    targetPaise: number;
+  };
+  /** Past cycles with money in or out (newest first, up to 6). */
+  history: { startDate: string; endDate: string; incomePaise: number; spentPaise: number; investedPaise: number }[];
+  emergency: {
+    /** Bank + cash, plus FDs not held as card collateral, minus money set aside for goals. */
+    liquidPaise: number;
+    /** Average spending per cycle (past cycles; else this cycle's budget). */
+    monthlySpendPaise: number | null;
+    basis: "history" | "budget" | null;
+    months: number | null;
+  };
+  goals: Goal[];
+  /** Money set aside for goals (stays in the bank). */
+  earmarkedPaise: number;
+  goalsMonthlyPaise: number;
+};
+
 export type Settings = {
   owner_names: string[];
   liquid_buffer_paise: number;
   autopay_buffer_paise: number;
   salary_employer: string;
   salary_min_paise: number;
+  savings_target_paise: number;
+  savings_account_id: number | null;
 };
 
 export type Bootstrap = {
@@ -96,7 +134,7 @@ export type SalaryPlan = {
   salaryPaise: number;
   salaryAccountId: number | null;
   items: {
-    key: "card_bill" | "spending" | "autopays";
+    key: "card_bill" | "spending" | "autopays" | "savings";
     label: string;
     fromAccountId: number;
     toAccountId: number;
@@ -108,6 +146,10 @@ export type SalaryPlan = {
   }[];
   /** What stays in the salary account after the remaining moves. */
   keepPaise: number;
+  /** Savings target kept in the salary account (0 when savings move to their own account, a plan item then). */
+  savingsTargetPaise: number;
+  /** This month's set-aside for goals (stays in the salary account, earmarked). */
+  goalsMonthlyPaise: number;
 };
 
 export type Occurrence = {

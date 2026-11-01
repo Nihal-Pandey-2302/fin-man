@@ -10,6 +10,7 @@ import { CardBill } from "@/components/card-bill";
 import { GettingStarted } from "@/components/getting-started";
 import { Money } from "@/components/money";
 import { SalaryPlanCard } from "@/components/salary-plan-card";
+import { SavingsCard } from "@/components/savings-card";
 import { SalarySheet } from "@/components/salary-sheet";
 import { TxnEditor, type EditorTarget } from "@/components/txn-editor";
 import { TxnRow } from "@/components/txn-row";
@@ -91,6 +92,7 @@ export default function HomePage() {
           {/* Empty charts on a fresh install are just noise. */}
           {isPending ? <Skeleton className="h-40 rounded-xl" /> : (d.daily.some((x) => x.spentPaise > 0) || d.cycle.budgetPaise > 0) && <DailyChart d={d} />}
           {isPending ? <Skeleton className="h-64 rounded-xl" /> : d.byCategory.some((c) => c.spentPaise > 0 || c.limitPaise) && <ByCategory d={d} />}
+          <SavingsCard />
         </div>
         <div className="space-y-4">
           <Balances d={d} loading={isPending} />

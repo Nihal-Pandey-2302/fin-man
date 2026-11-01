@@ -13,6 +13,10 @@ export const SETTING_DEFAULTS = {
   /** Salary detection (Phase 2): employer name fragment and minimum amount. */
   salary_employer: "",
   salary_min_paise: 0,
+  /** How much to save each cycle ("pay yourself first"). */
+  savings_target_paise: 0,
+  /** Optional account the savings are moved to (else they stay in the salary account). */
+  savings_account_id: null as number | null,
 };
 export type Settings = typeof SETTING_DEFAULTS;
 export type SettingKey = keyof Settings;

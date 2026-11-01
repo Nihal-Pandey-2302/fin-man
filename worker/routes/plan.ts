@@ -10,6 +10,7 @@ import {
   budgetCycles,
   categoryBudgets,
   FREQUENCIES,
+  goals,
   HOLDING_TYPES,
   holdings,
   LOAN_DIRECTIONS,
@@ -20,10 +21,11 @@ import {
 } from "../db/schema";
 import { advanceAutopay, autopayCalendar } from "../ledger/autopays";
 import { currentCycle, startCycle } from "../ledger/cycles";
+import { serializeGoal } from "../ledger/savings";
 import { settleNewTransaction } from "../ledger/settle";
 import { findOpenLeg } from "../ledger/twins";
 import type { AppEnv } from "../types";
-import { date, dayOfMonth, id, idParam, paise, text } from "./validators";
+import { date, dayOfMonth, id, idParam, paise, signedPaise, text } from "./validators";
 
 const paidSchema = z.object({ paidOn: date.optional(), amountPaise: paise.optional() });
 
@@ -168,6 +170,44 @@ export const presetRoutes = new Hono<AppEnv>()
   })
   .delete("/:id", idParam, async (c) => {
     await c.var.db.delete(quickAddPresets).where(eq(quickAddPresets.id, c.req.valid("param").id));
+    return c.json({ deleted: true });
+  });
+
+// ---------------- savings goals ----------------
+const goalSchema = z.object({
+  name: text(60).min(1),
+  targetPaise: paise,
+  dueOn: date.nullish(),
+  monthlyPaise: paise.nullish(),
+  archived: z.boolean().optional(),
+});
+
+export const goalRoutes = new Hono<AppEnv>()
+  .get("/", async (c) => {
+    const today = istDate();
+    const rows = await c.var.db.select().from(goals).orderBy(asc(goals.archived), asc(goals.dueOn), asc(goals.id)).all();
+    return c.json(rows.map((g) => serializeGoal(g, today)));
+  })
+  .post("/", zValidator("json", goalSchema), async (c) => {
+    const [row] = await c.var.db.insert(goals).values(c.req.valid("json")).returning();
+    return c.json(serializeGoal(row, istDate()), 201);
+  })
+  .patch("/:id", idParam, zValidator("json", goalSchema.partial()), async (c) => {
+    const [row] = await c.var.db.update(goals).set(c.req.valid("json")).where(eq(goals.id, c.req.valid("param").id)).returning();
+    return row ? c.json(serializeGoal(row, istDate())) : c.json({ error: "not_found" }, 404);
+  })
+  /** Set money aside for a goal (positive) or take it back / spend it (negative). Never below zero. */
+  .post("/:id/set-aside", idParam, zValidator("json", z.object({ amountPaise: signedPaise.refine((n) => n !== 0) })), async (c) => {
+    const { amountPaise } = c.req.valid("json");
+    const [row] = await c.var.db
+      .update(goals)
+      .set({ savedPaise: sql`MAX(0, ${goals.savedPaise} + ${amountPaise})` })
+      .where(eq(goals.id, c.req.valid("param").id))
+      .returning();
+    return row ? c.json(serializeGoal(row, istDate())) : c.json({ error: "not_found" }, 404);
+  })
+  .delete("/:id", idParam, async (c) => {
+    await c.var.db.delete(goals).where(eq(goals.id, c.req.valid("param").id));
     return c.json({ deleted: true });
   });
 

@@ -7,6 +7,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 const TABLES = [
   "accounts", "account_numbers", "categories", "transactions", "sms_raw", "merchant_rules", "autopays",
   "budget_cycles", "category_budgets", "holdings", "loans", "loan_payments", "quick_add_presets", "settings",
+  "card_statements", "goals",
 ];
 const remote = process.argv.includes("--remote");
 

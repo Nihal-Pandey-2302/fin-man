@@ -8,6 +8,7 @@ import * as schema from "../db/schema";
 import { buildAlerts } from "../ledger/alerts";
 import { buildDashboard, reviewCount } from "../ledger/dashboard";
 import { buildReport } from "../ledger/report";
+import { buildSavings } from "../ledger/savings";
 import { buildSalaryPlan } from "../ledger/salary-plan";
 import { getSettings, setSetting, type Settings } from "../ledger/settings";
 import type { AppEnv } from "../types";
@@ -20,11 +21,13 @@ const settingsSchema = z
     autopay_buffer_paise: z.number().int().min(0),
     salary_employer: z.string().trim().max(80),
     salary_min_paise: z.number().int().min(0),
+    savings_target_paise: z.number().int().min(0),
+    savings_account_id: z.number().int().positive().nullable(),
   })
   .partial();
 
 /** Every table, for `npm run backup` / the Settings download button. */
-const EXPORT_TABLES = {
+export const EXPORT_TABLES = {
   accounts: schema.accounts,
   account_numbers: schema.accountNumbers,
   categories: schema.categories,
@@ -39,6 +42,8 @@ const EXPORT_TABLES = {
   loan_payments: schema.loanPayments,
   quick_add_presets: schema.quickAddPresets,
   settings: schema.settings,
+  card_statements: schema.cardStatements,
+  goals: schema.goals,
 };
 
 export const miscRoutes = new Hono<AppEnv>()
@@ -62,6 +67,7 @@ export const miscRoutes = new Hono<AppEnv>()
   .get("/dashboard", async (c) => c.json(await buildDashboard(c.var.db)))
   .get("/alerts", async (c) => c.json(await buildAlerts(c.var.db)))
   .get("/salary-plan", async (c) => c.json(await buildSalaryPlan(c.var.db)))
+  .get("/savings", async (c) => c.json(await buildSavings(c.var.db)))
   .get("/report", zValidator("query", z.object({ start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() })), async (c) =>
     c.json(await buildReport(c.var.db, c.req.valid("query").start)),
   )

@@ -1,6 +1,6 @@
 import { keepPreviousData, QueryCache, QueryClient, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import type { Autopay, Bootstrap, Category, Cycle, Dashboard, Holding, Loan, Occurrence, Page, Report, Review, Rule, SalaryPlan, Settings, Txn } from "@shared/api";
+import type { Autopay, Bootstrap, Category, Cycle, Dashboard, Goal, Holding, Loan, Occurrence, Page, Report, Review, Rule, SalaryPlan, Savings, Settings, Txn } from "@shared/api";
 import { api, ApiError, errorMessage } from "./api";
 
 export type Session = { configured: boolean; authenticated: boolean };
@@ -35,11 +35,13 @@ export const keys = {
   salaryPlan: ["salary-plan"] as const,
   calendar: ["autopay-calendar"] as const,
   report: (start?: string) => ["report", start ?? "current"] as const,
+  savings: ["savings"] as const,
+  goals: ["goals"] as const,
 };
 
 /** Money moved: anything derived from the ledger is stale. */
 export function invalidateLedger(qc = queryClient) {
-  for (const key of [keys.bootstrap, keys.dashboard, keys.review, ["transactions"], keys.rules, keys.loans, keys.salaryPlan, keys.calendar, keys.autopays, keys.cycles, ["report"]]) {
+  for (const key of [keys.bootstrap, keys.dashboard, keys.review, ["transactions"], keys.rules, keys.loans, keys.salaryPlan, keys.calendar, keys.autopays, keys.cycles, ["report"], keys.savings, keys.goals]) {
     void qc.invalidateQueries({ queryKey: key });
   }
 }
@@ -55,6 +57,8 @@ export const useSalaryPlan = () => useQuery({ queryKey: keys.salaryPlan, queryFn
 export const useAutopayCalendar = () => useQuery({ queryKey: keys.calendar, queryFn: () => api<Occurrence[]>("/autopays/calendar") });
 export const useReport = (start?: string) =>
   useQuery({ queryKey: keys.report(start), queryFn: () => api<Report>(`/report${start ? `?start=${start}` : ""}`), placeholderData: keepPreviousData });
+export const useSavings = () => useQuery({ queryKey: keys.savings, queryFn: () => api<Savings>("/savings") });
+export const useGoals = () => useQuery({ queryKey: keys.goals, queryFn: () => api<Goal[]>("/goals") });
 export const useHoldings = () => useQuery({ queryKey: keys.holdings, queryFn: () => api<Holding[]>("/holdings") });
 
 export type TxnFilters = {

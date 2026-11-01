@@ -8,6 +8,7 @@ import type { Autopay, Loan } from "@shared/api";
 import { formatPaise, rupeesToPaise } from "@shared/money";
 import { formatShortDate, istDate } from "@shared/time";
 import { Money } from "@/components/money";
+import { GoalsCard } from "@/components/goals-card";
 import { SalaryPlanCard } from "@/components/salary-plan-card";
 import { SalarySheet } from "@/components/salary-sheet";
 import { NativeSelect } from "@/components/native-select";
@@ -39,6 +40,7 @@ export default function PlanPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <CycleCard />
         {plan && <SalaryPlanCard plan={plan} />}
+        <GoalsCard />
         <AutopaysCard />
         <LoansCard />
       </div>

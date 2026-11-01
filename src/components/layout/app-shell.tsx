@@ -13,7 +13,7 @@ export function AppShell() {
   const [quickAddOpen, setQuickAddOpen] = useState(() => new URLSearchParams(window.location.search).get("add") === "1");
   const { data } = useBootstrap();
   const review = data?.reviewCount ?? 0;
-  const { pathname } = useLocation();
+  const { pathname, hash } = useLocation();
   const [params] = useSearchParams();
   const navigate = useNavigate();
 
@@ -21,10 +21,33 @@ export function AppShell() {
     if (params.has("add")) navigate(pathname, { replace: true });
   }, [params, pathname, navigate]);
 
-  // Braced body: Chrome's scrollTo now returns a Promise, which React would treat as a cleanup.
+  // New page: start at the top, or at `#id` (e.g. /plan#savings); lazy pages may need a few frames to render it.
+  // Braced bodies: Chrome's scrollTo now returns a Promise, which React would treat as a cleanup.
   useEffect(() => {
-    window.scrollTo({ top: 0 });
-  }, [pathname]);
+    const id = hash.slice(1);
+    if (!id) {
+      window.scrollTo({ top: 0 });
+      return;
+    }
+    let tries = 0;
+    let frame = 0;
+    let settle = 0;
+    const find = () => {
+      const el = document.getElementById(id);
+      if (!el) {
+        if (tries++ < 60) frame = requestAnimationFrame(find);
+        return;
+      }
+      el.scrollIntoView({ block: "start" });
+      // Cards above swap skeletons for data and shift the page: line it up again once they've loaded.
+      settle = window.setTimeout(() => el.scrollIntoView({ block: "start" }), 600);
+    };
+    find();
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(settle);
+    };
+  }, [pathname, hash]);
 
   // Laptop shortcut: `n` opens quick add (ignored while typing in a field).
   useEffect(() => {
