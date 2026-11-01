@@ -95,8 +95,8 @@ const expected: Record<string, ReturnType<typeof parseSms>> = {
   "indian/autopay_notice.txt": {
     parser: "indian",
     result: {
-      type: "notice", notice: "autopay_upcoming", institution: "INDIAN", amountPaise: 578_100,
-      payee: "Royal Bison Autorent", dueOn: "2026-08-07",
+      type: "notice", notice: "autopay_upcoming", institution: "INDIAN", amountPaise: 612_000,
+      payee: "Zenith Auto Rentals", dueOn: "2026-08-07",
     },
   },
   "hdfc/upi_debit.txt": {

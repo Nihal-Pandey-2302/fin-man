@@ -1,7 +1,7 @@
 import { rupeesToPaise } from "../../../shared/money";
 import { istDate, istToUtc } from "../../../shared/time";
 
-/** Amount token: "2,000.00", "1578.00", "23109.86", "5781". Stops before a sentence-ending period. */
+/** Amount token: "2,000.00", "1578.00", "23109.86", "6120". Stops before a sentence-ending period. */
 export const AMT = String.raw`(\d[\d,]*(?:\.\d{1,2})?)`;
 /** Currency prefix: "INR ", "Rs.", "Rs. ", "Rs ". */
 export const CUR = String.raw`(?:INR|Rs\.?)\s*`;

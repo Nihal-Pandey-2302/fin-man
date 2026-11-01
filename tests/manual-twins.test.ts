@@ -115,12 +115,12 @@ describe("autopay marked paid by hand", () => {
 
   it("records the debit on its due day, links it, and undoes cleanly", async () => {
     const { indian } = await seedAccounts();
-    const a = await autopay(indian.id, 578_100, "2026-10-30");
+    const a = await autopay(indian.id, 612_000, "2026-10-30");
     const r = await json<{ nextDueOn: string; transactionId: number; linked: boolean }>(api(`/autopays/${a.id}/paid`, { method: "POST", json: {} }));
     expect(r).toMatchObject({ nextDueOn: "2026-11-30", linked: false });
 
     const [t] = await allTxns();
-    expect(t).toMatchObject({ id: r.transactionId, accountId: indian.id, amountPaise: 578_100, direction: "debit", kind: "expense", autopayId: a.id, transferGroupId: null });
+    expect(t).toMatchObject({ id: r.transactionId, accountId: indian.id, amountPaise: 612_000, direction: "debit", kind: "expense", autopayId: a.id, transferGroupId: null });
     expect(+t.occurredAt).toBe(+ist(2026, 10, 30));
 
     await api(`/transactions/${t.id}`, { method: "DELETE" });

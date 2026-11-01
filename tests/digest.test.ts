@@ -22,7 +22,7 @@ it("sums up the week, the cycle and what's coming, in one short push", async () 
   await spend(30_000, food, ist(11, 5));
   await spend(20_000, await cat("Transport"), ist(11, 6));
   await spend(150_000, await cat("Groceries"), ist(10, 28)); // the week before
-  await api("/autopays", { method: "POST", json: { name: "Car EMI", kind: "emi", accountId: indian.id, amountPaise: 578_100, dayOfMonth: 12, nextDueOn: "2026-11-12" } });
+  await api("/autopays", { method: "POST", json: { name: "Car EMI", kind: "emi", accountId: indian.id, amountPaise: 612_000, dayOfMonth: 12, nextDueOn: "2026-11-12" } });
   await db.update(schema.accounts).set({ creditLimitPaise: 5_000_000, statementDay: 20, dueDay: 10, openingBalancePaise: 2_000_000, openingBalanceAt: new Date(ist(10, 25)) }).where(eq(schema.accounts.id, card.id));
   await api(`/cards/${card.id}/statement`, { method: "PUT", json: { statementDate: "2026-10-20", amountPaise: 2_000_000 } });
 
@@ -32,15 +32,15 @@ it("sums up the week, the cycle and what's coming, in one short push", async () 
   expect(g.top).toEqual({ name: "Food & dining", emoji: "🍔", spentPaise: 80_000 });
   expect(g.coming).toEqual([
     { name: "Card bill", amountPaise: 2_000_000, dueOn: "2026-11-10" },
-    { name: "Car EMI", amountPaise: 578_100, dueOn: "2026-11-12" },
+    { name: "Car EMI", amountPaise: 612_000, dueOn: "2026-11-12" },
   ]);
-  const left = 3_000_000 - 100_000 - 578_100;
+  const left = 3_000_000 - 100_000 - 612_000;
   expect(g.cycle).toEqual({ leftPaise: left, daysLeft: 23, perDayPaise: Math.floor(left / 23) });
 
   const note = digestNote(g);
   expect(note.title).toBe("Your week: ₹1,000 spent (down from ₹1,500)");
   expect(note.body).toContain("Most on 🍔 Food & dining: ₹800.");
-  expect(note.body).toContain("Coming up: Card bill ₹20,000 (10 Nov), Car EMI ₹5,781 (12 Nov).");
+  expect(note.body).toContain("Coming up: Card bill ₹20,000 (10 Nov), Car EMI ₹6,120 (12 Nov).");
   expect(note.tag).toBe("digest:2026-11-08");
 });
 

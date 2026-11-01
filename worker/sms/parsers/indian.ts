@@ -23,7 +23,7 @@ const UPI_CREDIT = new RegExp(
   "is",
 );
 
-// "Your account will be debited with Rs 5781.00 towards Royal Bison Autorent for the Autopay on 07-Aug-26.
+// "Your account will be debited with Rs 6120.00 towards Zenith Auto Rentals for the Autopay on 07-Aug-26.
 //  Pause mandate to stop execution - Indian Bank"
 const AUTOPAY_NOTICE = new RegExp(
   String.raw`will be debited with ${CUR}${AMT} towards (.+?) for the Autopay on (\d{1,2}-[A-Za-z]{3}-\d{2,4})${SIGNOFF}`,

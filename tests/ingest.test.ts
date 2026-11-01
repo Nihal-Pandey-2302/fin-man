@@ -140,7 +140,7 @@ describe("POST /api/ingest/sms", () => {
     const out = await (await postSms("VM-INDBNK", fixture("indian/autopay_notice.txt"))).json();
     expect(out).toMatchObject({ status: "ignored", reason: "autopay_upcoming" });
     const [row] = await db.select().from(smsRaw);
-    expect(JSON.parse(row.parsedJson!)).toMatchObject({ payee: "Royal Bison Autorent", dueOn: "2026-08-07" });
+    expect(JSON.parse(row.parsedJson!)).toMatchObject({ payee: "Zenith Auto Rentals", dueOn: "2026-08-07" });
     expect(await db.select().from(transactions)).toHaveLength(0);
   });
 

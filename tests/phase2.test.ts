@@ -68,12 +68,12 @@ describe("autopays", () => {
   it("matches the debit to its autopay, marks it paid and moves the due date", async () => {
     const { indian } = await seedAccounts();
     const emi = await json<{ id: number }>(
-      api("/autopays", { method: "POST", json: { name: "Royal Bison Autorent", kind: "emi", accountId: indian.id, amountPaise: 578_100, dayOfMonth: 7, nextDueOn: "2026-11-07" } }),
+      api("/autopays", { method: "POST", json: { name: "Zenith Auto Rentals", kind: "emi", accountId: indian.id, amountPaise: 612_000, dayOfMonth: 7, nextDueOn: "2026-11-07" } }),
     );
     const sip = await json<{ id: number }>(
       api("/autopays", { method: "POST", json: { name: "Flexi Cap SIP", kind: "sip", accountId: indian.id, amountPaise: 500_000, dayOfMonth: 10, nextDueOn: "2026-11-10" } }),
     );
-    const paid = await txn({ accountId: indian.id, amountPaise: 578_100, direction: "debit", kind: "expense", merchant: "NACH ROYAL BISON", occurredAt: iso("2026-11-08") });
+    const paid = await txn({ accountId: indian.id, amountPaise: 612_000, direction: "debit", kind: "expense", merchant: "NACH ZENITH AUTO", occurredAt: iso("2026-11-08") });
     const sipDebit = await txn({ accountId: indian.id, amountPaise: 500_000, direction: "debit", kind: "expense", occurredAt: iso("2026-11-10") });
 
     const rows = await db.select().from(schema.transactions).all();
@@ -84,9 +84,9 @@ describe("autopays", () => {
 
     const cal = await autopayCalendar(db, "2026-11-01", "2026-12-31", "2026-11-20");
     expect(cal.map((o: Occurrence) => [o.name, o.dueOn, o.status, o.transactionId])).toEqual([
-      ["Royal Bison Autorent", "2026-11-07", "paid", paid.id],
+      ["Zenith Auto Rentals", "2026-11-07", "paid", paid.id],
       ["Flexi Cap SIP", "2026-11-10", "paid", sipDebit.id],
-      ["Royal Bison Autorent", "2026-12-07", "due", null],
+      ["Zenith Auto Rentals", "2026-12-07", "due", null],
       ["Flexi Cap SIP", "2026-12-10", "due", null],
     ]);
   });
@@ -111,9 +111,9 @@ describe("autopays", () => {
     expect(alerts.some((a) => a.key.startsWith("untracked_autopay"))).toBe(false);
     await postSms("VM-INDBNK", notice);
     alerts = await buildAlerts(db);
-    expect(alerts.find((a) => a.key.startsWith("untracked_autopay"))?.title).toContain("Royal Bison Autorent");
+    expect(alerts.find((a) => a.key.startsWith("untracked_autopay"))?.title).toContain("Zenith Auto Rentals");
 
-    await api("/autopays", { method: "POST", json: { name: "Royal Bison", kind: "emi", accountId: indian.id, amountPaise: 578_100, dayOfMonth: 1, nextDueOn: addDays(future, -2) } });
+    await api("/autopays", { method: "POST", json: { name: "Zenith Auto", kind: "emi", accountId: indian.id, amountPaise: 612_000, dayOfMonth: 1, nextDueOn: addDays(future, -2) } });
     await postSms("VM-INDBNK", notice.replace("Pause", "Kindly pause")); // a second heads-up (new hash)
     const [ap] = await db.select().from(schema.autopays).all();
     expect(ap.nextDueOn).toBe(future);
@@ -128,11 +128,11 @@ describe("alerts", () => {
     await db.update(schema.accounts).set({ dueDay: 5 }).where(eq(schema.accounts.id, card.id));
     await postSms("JD-IDFCFB", fixture("card/spend_rupay_swiggy.txt"));
     await api(`/accounts/${indian.id}/balance`, { method: "POST", json: { balancePaise: 100_000 } });
-    await api("/autopays", { method: "POST", json: { name: "EMI", kind: "emi", accountId: indian.id, amountPaise: 578_100, dayOfMonth: 4, nextDueOn: "2026-11-04" } });
+    await api("/autopays", { method: "POST", json: { name: "EMI", kind: "emi", accountId: indian.id, amountPaise: 612_000, dayOfMonth: 4, nextDueOn: "2026-11-04" } });
 
     const alerts = await buildAlerts(db, today);
     expect(alerts.find((a) => a.key.startsWith("card_due"))).toMatchObject({ level: "warn", title: "IDFC Credit Card bill due in 2 days" });
-    expect(alerts.find((a) => a.key.startsWith("autopay_short"))?.title).toBe("Indian Bank is ₹4,781 short");
+    expect(alerts.find((a) => a.key.startsWith("autopay_short"))?.title).toBe("Indian Bank is ₹5,120 short");
     expect(alerts.find((a) => a.key.startsWith("autopay_tomorrow"))?.body).toContain("EMI");
   });
 

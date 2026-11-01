@@ -23,7 +23,7 @@ describe("matching a friend's name", () => {
   it("accepts the bank's longer or truncated spelling, never a different person", () => {
     expect(personMatches("RAHUL SHARMA", "Rahul")).toBe(true);
     expect(personMatches("RAHUL SHARMA", "Rahul S")).toBe(true);
-    expect(personMatches("ANSHIKA SRIVASTAV", "Anshika Srivastava")).toBe(true); // bank-truncated
+    expect(personMatches("KAVYA RAGHUNATH", "Kavya Raghunathan")).toBe(true); // bank-truncated
     expect(personMatches("RAHUL SHARMA", "Rohit")).toBe(false);
     expect(personMatches("RAHUL SHARMA", "Rahul Kumar")).toBe(false);
   });
