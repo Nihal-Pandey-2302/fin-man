@@ -11,7 +11,7 @@ export async function dumpTables(d1: D1Database, source: string, now = new Date(
 /** Weekly automatic backups kept in Workers KV (separate from D1, free, no card needed). */
 export type BackupEnv = { BACKUPS?: KVNamespace };
 /** Must match the second cron in wrangler.jsonc. */
-export const BACKUP_CRON = "0 21 * * 6";
+export const BACKUP_CRON = "0 21 * * SAT";
 export const BACKUP_PREFIX = "backup:";
 export const BACKUPS_KEPT = 12;
 

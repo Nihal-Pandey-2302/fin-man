@@ -29,10 +29,11 @@
 		}
 	],
 	// 03:30 UTC = 09:00 IST: daily reminders (card due, autopays, salary, review inbox).
+	// Cloudflare cron weekdays are 1–7 with Sunday = 1, so use names.
 	// Sat 21:00 UTC = Sun 02:30 IST: weekly backup into Workers KV (BACKUPS binding, see worker/backup.ts).
 	// Sun 14:00 UTC = Sun 19:30 IST: weekly digest push (worker/ledger/digest.ts).
 	"triggers": {
-		"crons": ["30 3 * * *", "0 21 * * 6", "0 14 * * 0"]
+		"crons": ["30 3 * * *", "0 21 * * SAT", "0 14 * * SUN"]
 	},
 	"observability": {
 		"enabled": true

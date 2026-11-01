@@ -91,7 +91,7 @@ export function digestNote(g: Digest): PushNote {
 }
 
 /** Must match the third cron in wrangler.jsonc (Sun 14:00 UTC = 19:30 IST). */
-export const DIGEST_CRON = "0 14 * * 0";
+export const DIGEST_CRON = "0 14 * * SUN";
 
 export async function runDigest(db: Db, env: Env, fetcher?: typeof fetch) {
   if (!(await getSetting(db, "weekly_digest"))) return { sent: 0, skipped: "off" };
