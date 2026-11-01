@@ -3,7 +3,16 @@ import { eq } from "drizzle-orm";
 import type { Db } from "./db";
 import { pushSubscriptions } from "./db/schema";
 
-export type PushNote = { title: string; body: string; url?: string; tag?: string };
+export type PushNote = {
+  title: string;
+  body: string;
+  url?: string;
+  tag?: string;
+  /** Buttons on the notification (Android shows up to two); the service worker handles `cat:<id>`. */
+  actions?: { action: string; title: string }[];
+  /** The transaction the actions apply to. */
+  txnId?: number;
+};
 type VapidEnv = { VAPID_PUBLIC_KEY?: string; VAPID_PRIVATE_KEY?: string; VAPID_SUBJECT?: string };
 
 export const pushConfigured = (env: VapidEnv) => !!(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY);

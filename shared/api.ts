@@ -113,6 +113,7 @@ export type Settings = {
   salary_min_paise: number;
   savings_target_paise: number;
   savings_account_id: number | null;
+  notify_new_txns: boolean;
 };
 
 export type Bootstrap = {

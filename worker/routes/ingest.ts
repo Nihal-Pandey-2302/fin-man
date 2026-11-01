@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import { notifyNewTxn } from "../ledger/notify";
+import { pushConfigured } from "../push";
 import { ingestSms } from "../sms/ingest";
 import type { AppEnv } from "../types";
 
@@ -72,6 +74,10 @@ export const ingestRoutes = new Hono<AppEnv>()
     if (!parsed.success) return c.json({ error: "invalid_body", issues: parsed.error.issues }, 400);
     const { sender, body, received_at } = parsed.data;
     const outcome = await ingestSms(c.var.db, { sender, body, receivedAt: parseReceivedAt(received_at) });
+    // A live SMS that needs a category: ask on the phone right away (after responding; imports never push).
+    if (outcome.status === "created" && outcome.transactionId && pushConfigured(c.env)) {
+      c.executionCtx.waitUntil(notifyNewTxn(c.var.db, c.env, outcome.transactionId).catch((err) => console.error("notify", err)));
+    }
     // Always 200 for a well-formed request: retrying a duplicate/ignored/rejected SMS can't help.
     return c.json(outcome);
   });

@@ -12,8 +12,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { api, del, errorMessage, patch, post } from "@/lib/api";
-import { invalidateLedger, queryClient, useDashboard, useLookups, type Session } from "@/lib/queries";
+import { invalidateLedger, keys, queryClient, useDashboard, useLookups, type Session } from "@/lib/queries";
 import { relativeTime } from "@/lib/relative";
 import { SubPageHeader } from "./more";
 
@@ -166,6 +167,28 @@ const b64ToBytes = (b64url: string) => {
   return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 };
 
+/** Per-transaction pushes with category buttons (file a payment straight from the notification). */
+function NewTxnToggle() {
+  const { settings } = useLookups();
+  const qc = useQueryClient();
+  const on = settings?.notify_new_txns ?? true;
+  return (
+    <label className="flex items-start justify-between gap-3 border-t pt-3 text-sm">
+      <span>
+        <span className="block font-medium">New transactions</span>
+        <span className="block text-xs text-muted-foreground">A notification for each payment that needs a category, with buttons to file it.</span>
+      </span>
+      <Switch
+        checked={on}
+        onCheckedChange={async (checked) => {
+          await patch("/settings", { notify_new_txns: checked });
+          void qc.invalidateQueries({ queryKey: keys.bootstrap });
+        }}
+      />
+    </label>
+  );
+}
+
 function NotificationsCard() {
   const supported = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
   const [key, setKey] = useState<string | null | undefined>(undefined);
@@ -210,7 +233,8 @@ function NotificationsCard() {
         <CardTitle>Notifications</CardTitle>
         <CardDescription>A 9 am nudge for card bills, autopays, a missing salary and the review inbox. Install the app to the home screen first on Android.</CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-wrap gap-2">
+      <CardContent className="space-y-3">
+        <div className="flex flex-wrap gap-2">
         {!supported ? (
           <p className="text-sm text-muted-foreground">This browser doesn't support push notifications.</p>
         ) : key === null ? (
@@ -229,6 +253,8 @@ function NotificationsCard() {
             <Bell /> Turn on notifications
           </Button>
         )}
+        </div>
+        {sub && <NewTxnToggle />}
       </CardContent>
     </Card>
   );

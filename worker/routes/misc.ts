@@ -23,6 +23,7 @@ const settingsSchema = z
     salary_min_paise: z.number().int().min(0),
     savings_target_paise: z.number().int().min(0),
     savings_account_id: z.number().int().positive().nullable(),
+    notify_new_txns: z.boolean(),
   })
   .partial();
 

@@ -1,7 +1,11 @@
+import { eq } from "drizzle-orm";
 import { env } from "cloudflare:test";
 import { beforeEach, describe, expect, it } from "vitest";
 import { runDaily } from "../worker/daily";
+import { newTxnNote, notifyNewTxn } from "../worker/ledger/notify";
+import { setSetting } from "../worker/ledger/settings";
 import { sendToAll } from "../worker/push";
+import { fixture, postSms } from "./helpers";
 import { api, db, resetLedger, schema, seedAccounts } from "./helpers";
 
 const b64url = (buf: ArrayBuffer | Uint8Array) => {
@@ -62,5 +66,47 @@ describe("web push", () => {
     const r = await runDaily(db, env, fetcher);
     expect(r.notes).toBeGreaterThanOrEqual(2); // short + due tomorrow
     expect(pushes).toBe(r.notes);
+  });
+});
+
+describe("new-transaction pushes", () => {
+  it("asks about an uncategorised payment with two category buttons", async () => {
+    await seedAccounts();
+    const out = (await (await postSms("JD-IDFCFB-S", fixture("idfc/upi_debit.txt"))).json()) as { transactionId: number };
+    const note = await newTxnNote(db, out.transactionId);
+    expect(note).toMatchObject({ title: "−₹2,396 · HEY HABIBI", url: "/activity/review", tag: `txn:${out.transactionId}`, txnId: out.transactionId });
+    // No history yet: sensible defaults for a payment.
+    expect(note!.actions!.map((a) => a.title)).toEqual(["🍔 Food & dining", "🛒 Groceries"]);
+  });
+
+  it("guesses from the owner's habits on that account, and stays quiet for rule-filed spends", async () => {
+    const { idfc } = await seedAccounts();
+    const [transport] = await db.select().from(schema.categories).where(eq(schema.categories.name, "Transport"));
+    for (let i = 0; i < 3; i++) {
+      await api("/transactions", { method: "POST", json: { accountId: idfc.id, amountPaise: 10_000 + i, direction: "debit", kind: "expense", categoryId: transport.id } });
+    }
+    const out = (await (await postSms("JD-IDFCFB-S", fixture("idfc/upi_debit.txt"))).json()) as { transactionId: number };
+    expect((await newTxnNote(db, out.transactionId))!.actions![0].action).toBe(`cat:${transport.id}`);
+
+    // Swiggy on the card matches a seeded merchant rule: filed already, nothing to ask.
+    const card = (await (await postSms("JD-IDFCFB-S", fixture("card/spend_rupay_swiggy.txt"))).json()) as { transactionId: number };
+    expect(await newTxnNote(db, card.transactionId)).toBeNull();
+  });
+
+  it("can be switched off", async () => {
+    await seedAccounts();
+    // SMS first: the live ingest route pushes too, and with no subscription yet it can't reach the network.
+    const out = (await (await postSms("JD-IDFCFB-S", fixture("idfc/upi_debit.txt"))).json()) as { transactionId: number };
+    await api("/push/subscribe", { method: "POST", json: await fakeSubscription("https://push.example.com/a") });
+    let calls = 0;
+    const fetcher = (async () => {
+      calls++;
+      return new Response(null, { status: 201 });
+    }) as unknown as typeof fetch;
+    await notifyNewTxn(db, env, out.transactionId, fetcher);
+    expect(calls).toBe(1);
+    await setSetting(db, "notify_new_txns", false);
+    await notifyNewTxn(db, env, out.transactionId, fetcher);
+    expect(calls).toBe(1);
   });
 });
