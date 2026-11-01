@@ -91,7 +91,7 @@ Read this first if you're resuming after a context reset. Then read CLAUDE.md an
 5. [x] **Weekly automatic backups**: R2 needs a card on file, so these go to Workers KV (free, separate from D1).
    - `worker/backup.ts` `runBackup` runs on cron `0 21 * * 6` (Sun 02:30 IST) and writes `backup:YYYY-MM-DD` with every EXPORT_TABLES table, keeping 12. `EXPORT_TABLES`/`dumpTables` live here, shared with /api/export.
    - GET /api/backups lists them and GET /api/backups/:date downloads one; Settings shows the latest. Both are excluded from the SW cache.
-   - **Needs the KV namespace** (owner): `npx wrangler kv namespace create BACKUPS`, then add `"kv_namespaces": [{ "binding": "BACKUPS", "id": "<id>" }]` to wrangler.jsonc and deploy. Until then the cron logs "backup skipped".
+   - KV namespace BACKUPS created and bound 2026-11-01 (id in wrangler.jsonc). POST /api/backups/run backs up on demand (Settings → Back up now). Everything up to #5 is deployed.
    - Watch the free-plan 10 ms CPU limit on cron as sms_raw grows (JSON.stringify of the whole DB).
    - There's no restore script yet.
 6. Later: 6-month trends and unusual-spend alerts, merchant pages, splitting with friends (→ loans), weekly digest push.
