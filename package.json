@@ -16,6 +16,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "wrangler d1 migrations apply DB --local",
     "backup": "node scripts/backup.mjs",
+    "restore": "node scripts/restore.mjs",
     "pwa-assets": "pwa-assets-generator",
     "vapid": "node scripts/vapid.mjs"
   },

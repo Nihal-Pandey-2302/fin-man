@@ -93,7 +93,7 @@ Read this first if you're resuming after a context reset. Then read CLAUDE.md an
    - GET /api/backups lists them and GET /api/backups/:date downloads one; Settings shows the latest. Both are excluded from the SW cache.
    - KV namespace BACKUPS created and bound 2026-11-01 (id in wrangler.jsonc). POST /api/backups/run backs up on demand (Settings → Back up now). Everything up to #5 is deployed.
    - Watch the free-plan 10 ms CPU limit on cron as sms_raw grows (JSON.stringify of the whole DB).
-   - There's no restore script yet.
+   - Restore: `npm run restore -- <file> [--remote]` (scripts/restore.mjs) → safety backup, `restoreStatements()` from shared/backup-sql.ts, row-count check. Backups are format v2 (raw SQL rows); v1 files (camelCase from the old /api/export) are refused. A round-trip test covers multi-line SMS and quotes.
 6. Later: 6-month trends and unusual-spend alerts, merchant pages, splitting with friends (→ loans), weekly digest push.
 
 ## Waiting on the owner

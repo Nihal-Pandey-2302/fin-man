@@ -1,31 +1,11 @@
+import { BACKUP_FORMAT_VERSION, BACKUP_TABLES, type BackupFile, type BackupRow } from "../shared/backup-sql";
 import { istDate } from "../shared/time";
-import type { Db } from "./db";
-import * as schema from "./db/schema";
 
-/** Every table that a restore needs (push subscriptions are per-device and re-register themselves). */
-export const EXPORT_TABLES = {
-  accounts: schema.accounts,
-  account_numbers: schema.accountNumbers,
-  categories: schema.categories,
-  transactions: schema.transactions,
-  sms_raw: schema.smsRaw,
-  merchant_rules: schema.merchantRules,
-  autopays: schema.autopays,
-  budget_cycles: schema.budgetCycles,
-  category_budgets: schema.categoryBudgets,
-  holdings: schema.holdings,
-  loans: schema.loans,
-  loan_payments: schema.loanPayments,
-  quick_add_presets: schema.quickAddPresets,
-  settings: schema.settings,
-  card_statements: schema.cardStatements,
-  goals: schema.goals,
-};
-
-/** The same JSON as `npm run backup` and the Settings download. */
-export async function dumpTables(db: Db, source: string, now = new Date()) {
-  const entries = await Promise.all(Object.entries(EXPORT_TABLES).map(async ([name, table]) => [name, await db.select().from(table).all()] as const));
-  return { app: "fintrack", version: 1, source, exportedAt: now.toISOString(), tables: Object.fromEntries(entries) };
+/** Every table as raw SQL rows: the same file as `npm run backup`, restorable with `npm run restore`. */
+export async function dumpTables(d1: D1Database, source: string, now = new Date()): Promise<BackupFile> {
+  const results = await d1.batch<BackupRow>(BACKUP_TABLES.map((t) => d1.prepare(`SELECT * FROM "${t}"`)));
+  const tables = Object.fromEntries(BACKUP_TABLES.map((t, i) => [t, results[i].results]));
+  return { app: "fintrack", version: BACKUP_FORMAT_VERSION, source, exportedAt: now.toISOString(), tables };
 }
 
 /** Weekly automatic backups kept in Workers KV (separate from D1, free, no card needed). */
@@ -35,8 +15,8 @@ export const BACKUP_CRON = "0 21 * * 6";
 export const BACKUP_PREFIX = "backup:";
 export const BACKUPS_KEPT = 12;
 
-export async function runBackup(db: Db, kv: KVNamespace, now = new Date()) {
-  const body = JSON.stringify(await dumpTables(db, "auto", now));
+export async function runBackup(d1: D1Database, kv: KVNamespace, now = new Date()) {
+  const body = JSON.stringify(await dumpTables(d1, "auto", now));
   const key = `${BACKUP_PREFIX}${istDate(now)}`;
   await kv.put(key, body, { metadata: { bytes: body.length, exportedAt: now.toISOString() } });
   const { keys } = await kv.list({ prefix: BACKUP_PREFIX });

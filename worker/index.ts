@@ -63,7 +63,7 @@ export default {
     const db = getDb(env.DB);
     if (controller.cron === BACKUP_CRON) {
       const kv = (env as Env & BackupEnv).BACKUPS;
-      if (kv) ctx.waitUntil(runBackup(db, kv).then((r) => console.log("backup", r)));
+      if (kv) ctx.waitUntil(runBackup(env.DB, kv).then((r) => console.log("backup", r)));
       else console.warn("backup skipped: no BACKUPS KV binding");
       return;
     }

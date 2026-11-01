@@ -25,10 +25,13 @@ First run: `npm install && cp .dev.vars.example .dev.vars && npm run db:migrate`
 - `npm run typecheck` · `npm run lint` (oxlint) · `npm run build`
 - `npm run db:generate`: drizzle-kit turns `worker/db/schema.ts` into SQL in `migrations/`. `npm run db:migrate` applies it to the **local** D1.
 - `npm run backup`: dumps every table to `backups/fintrack-local-<time>.json` (gitignored). Add `-- --remote` to dump the deployed D1 instead, using your wrangler login.
+- `npm run restore -- <file> [--remote]`: replaces all data with a backup's. It takes a safety backup first and checks the row counts afterwards; `--remote` asks you to type "restore". Files come from `npm run backup`, Settings → Full backup, or the weekly KV backups.
+  - The one table list and the file format live in `shared/backup-sql.ts`; a test fails if a table is missing.
+  - Format v2 stores raw SQL rows.
 - `npm run pwa-assets`: regenerate PWA icons from `public/icon.svg`.
 - `npm run vapid`: generate VAPID keys for web push into `.dev.vars`.
 - `npm run cf-typegen`: regenerate `worker-configuration.d.ts` after editing `wrangler.jsonc` or `.dev.vars`.
-- There is intentionally no `deploy` script yet (see Guardrails).
+- `npm run deploy`: build, apply pending migrations to the deployed D1 (stops if they fail), then deploy. Needs the owner's OK (see Guardrails).
 
 Both dev servers share the local D1 in `.wrangler/state`. Delete that folder to reset local data.
 

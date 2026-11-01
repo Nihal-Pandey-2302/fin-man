@@ -108,7 +108,7 @@ export const miscRoutes = new Hono<AppEnv>()
   .post("/backups/run", async (c) => {
     const kv = (c.env as Env & BackupEnv).BACKUPS;
     if (!kv) return c.json({ error: "not_configured" }, 503);
-    return c.json(await runBackup(c.var.db, kv));
+    return c.json(await runBackup(c.env.DB, kv));
   })
   .get("/backups/:date", zValidator("param", z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) })), async (c) => {
     const kv = (c.env as Env & BackupEnv).BACKUPS;
@@ -121,5 +121,5 @@ export const miscRoutes = new Hono<AppEnv>()
   })
   .get("/export", async (c) => {
     c.header("Content-Disposition", `attachment; filename="fintrack-${new Date().toISOString().slice(0, 10)}.json"`);
-    return c.json(await dumpTables(c.var.db, "download"));
+    return c.json(await dumpTables(c.env.DB, "download"));
   });
