@@ -49,7 +49,12 @@ export default defineConfig({
           {
             // Last-known numbers when offline; always fresh when online.
             urlPattern: ({ url, request }) =>
-              url.pathname.startsWith("/api/") && request.method === "GET" && !url.pathname.startsWith("/api/export") && url.pathname !== "/api/sms-forwarding",
+              url.pathname.startsWith("/api/") &&
+              request.method === "GET" &&
+              // Downloads and the ingest secret never go into the offline cache.
+              !url.pathname.startsWith("/api/export") &&
+              !url.pathname.startsWith("/api/backups/") &&
+              url.pathname !== "/api/sms-forwarding",
             handler: "NetworkFirst",
             options: { cacheName: "api", networkTimeoutSeconds: 5, expiration: { maxEntries: 60, maxAgeSeconds: 7 * 86_400 } },
           },

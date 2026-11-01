@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { BACKUP_CRON, runBackup, type BackupEnv } from "./backup";
 import { runDaily } from "./daily";
 import { getDb } from "./db";
 import { accountRoutes } from "./routes/accounts";
@@ -57,8 +58,15 @@ export type AppType = typeof app;
 
 export default {
   fetch: app.fetch,
-  /** Daily reminders (see `triggers.crons` in wrangler.jsonc). */
-  scheduled(_controller, env, ctx) {
-    ctx.waitUntil(runDaily(getDb(env.DB), env).then((r) => console.log("daily", r)));
+  /** Daily reminders and the weekly backup (see `triggers.crons` in wrangler.jsonc). */
+  scheduled(controller, env, ctx) {
+    const db = getDb(env.DB);
+    if (controller.cron === BACKUP_CRON) {
+      const kv = (env as Env & BackupEnv).BACKUPS;
+      if (kv) ctx.waitUntil(runBackup(db, kv).then((r) => console.log("backup", r)));
+      else console.warn("backup skipped: no BACKUPS KV binding");
+      return;
+    }
+    ctx.waitUntil(runDaily(db, env).then((r) => console.log("daily", r)));
   },
 } satisfies ExportedHandler<Env>;

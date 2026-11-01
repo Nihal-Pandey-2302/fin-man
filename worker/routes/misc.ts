@@ -8,6 +8,7 @@ import * as schema from "../db/schema";
 import { buildAlerts } from "../ledger/alerts";
 import { buildDashboard, reviewCount } from "../ledger/dashboard";
 import { buildReport } from "../ledger/report";
+import { BACKUP_PREFIX, dumpTables, listBackups, type BackupEnv } from "../backup";
 import { findRecurring } from "../ledger/recurring";
 import { buildSavings } from "../ledger/savings";
 import { buildSalaryPlan } from "../ledger/salary-plan";
@@ -28,26 +29,6 @@ const settingsSchema = z
     dismissed_recurring: z.array(z.string().max(120)).max(500),
   })
   .partial();
-
-/** Every table, for `npm run backup` / the Settings download button. */
-export const EXPORT_TABLES = {
-  accounts: schema.accounts,
-  account_numbers: schema.accountNumbers,
-  categories: schema.categories,
-  transactions: schema.transactions,
-  sms_raw: schema.smsRaw,
-  merchant_rules: schema.merchantRules,
-  autopays: schema.autopays,
-  budget_cycles: schema.budgetCycles,
-  category_budgets: schema.categoryBudgets,
-  holdings: schema.holdings,
-  loans: schema.loans,
-  loan_payments: schema.loanPayments,
-  quick_add_presets: schema.quickAddPresets,
-  settings: schema.settings,
-  card_statements: schema.cardStatements,
-  goals: schema.goals,
-};
 
 export const miscRoutes = new Hono<AppEnv>()
   /** The ingest secret, so the owner can copy it into MacroDroid from Settings (behind the login; never cached). */
@@ -118,9 +99,21 @@ export const miscRoutes = new Hono<AppEnv>()
     c.header("Content-Disposition", `attachment; filename="fintrack-transactions-${new Date().toISOString().slice(0, 10)}.csv"`);
     return c.body(`\uFEFF${lines.join("\r\n")}\r\n`);
   })
+  /** Automatic weekly backups (Workers KV), newest first; `configured: false` until the KV binding exists. */
+  .get("/backups", async (c) => {
+    const kv = (c.env as Env & BackupEnv).BACKUPS;
+    return c.json({ configured: !!kv, backups: kv ? await listBackups(kv) : [] });
+  })
+  .get("/backups/:date", zValidator("param", z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) })), async (c) => {
+    const kv = (c.env as Env & BackupEnv).BACKUPS;
+    const date = c.req.valid("param").date;
+    const body = kv ? await kv.get(`${BACKUP_PREFIX}${date}`) : null;
+    if (!body) return c.json({ error: "not_found" }, 404);
+    c.header("Content-Disposition", `attachment; filename="fintrack-auto-${date}.json"`);
+    c.header("Content-Type", "application/json");
+    return c.body(body);
+  })
   .get("/export", async (c) => {
-    const db = c.var.db;
-    const entries = await Promise.all(Object.entries(EXPORT_TABLES).map(async ([name, table]) => [name, await db.select().from(table).all()] as const));
     c.header("Content-Disposition", `attachment; filename="fintrack-${new Date().toISOString().slice(0, 10)}.json"`);
-    return c.json({ app: "fintrack", version: 1, exportedAt: new Date().toISOString(), tables: Object.fromEntries(entries) });
+    return c.json(await dumpTables(c.var.db, "download"));
   });

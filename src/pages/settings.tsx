@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { cn } from "cn";
 import { formatPaise, rupeesToPaise } from "@shared/money";
+import { formatShortDate } from "@shared/time";
 import { NativeSelect } from "@/components/native-select";
 import { useTheme, type Theme } from "@/components/theme";
 import { RupeeInput } from "@/components/rupee-input";
@@ -334,6 +335,38 @@ function PresetsCard() {
   );
 }
 
+/** The weekly automatic backup (Workers KV, last 12 kept). */
+function AutoBackups() {
+  const { data } = useQuery({
+    queryKey: ["backups"],
+    queryFn: () => api<{ configured: boolean; backups: { date: string; bytes: number | null }[] }>("/backups"),
+    staleTime: 10 * 60_000,
+  });
+  if (!data) return null;
+  const last = data.backups[0];
+  return (
+    <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-3 text-sm">
+      <span className="min-w-0 flex-1">
+        <span className="block font-medium">Automatic backups</span>
+        <span className="block text-xs text-muted-foreground">
+          {!data.configured
+            ? "Not set up yet (needs the backup storage on Cloudflare)."
+            : last
+              ? `Weekly, Sunday 2:30 am · last ${formatShortDate(last.date)}${last.bytes ? ` · ${Math.max(1, Math.round(last.bytes / 1024))} KB` : ""} · ${data.backups.length} kept`
+              : "Weekly, Sunday 2:30 am · the first one runs this Sunday."}
+        </span>
+      </span>
+      {last && (
+        <Button variant="outline" size="sm" asChild>
+          <a href={`/api/backups/${last.date}`} download>
+            <Download /> Latest
+          </a>
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function AppearanceCard() {
   const { theme, setTheme } = useTheme();
   const options: { value: Theme; label: string; icon: typeof Sun }[] = [
@@ -371,6 +404,7 @@ function AppearanceCard() {
             </a>
           </Button>
         </div>
+        <AutoBackups />
         <Button
           variant="ghost"
           className="text-muted-foreground"

@@ -22,8 +22,9 @@
 		}
 	],
 	// 03:30 UTC = 09:00 IST: daily reminders (card due, autopays, salary, review inbox).
+	// Sat 21:00 UTC = Sun 02:30 IST: weekly backup into Workers KV (BACKUPS binding, see worker/backup.ts).
 	"triggers": {
-		"crons": ["30 3 * * *"]
+		"crons": ["30 3 * * *", "0 21 * * 6"]
 	},
 	"observability": {
 		"enabled": true
