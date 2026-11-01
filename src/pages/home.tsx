@@ -2,7 +2,7 @@ import { AlertCircle, ArrowRight, BriefcaseBusiness, CalendarClock, CircleHelp, 
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { cn } from "cn";
-import type { Dashboard, Txn } from "@shared/api";
+import type { Dashboard } from "@shared/api";
 import { formatPaise } from "@shared/money";
 import { addDays, daysBetween, formatShortDate } from "@shared/time";
 import { AlertBanners } from "@/components/alert-banners";
@@ -17,6 +17,7 @@ import { TxnRow } from "@/components/txn-row";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { collapsePairs } from "@/lib/labels";
 import { relativeTime } from "@/lib/relative";
 import { useDashboard, useLookups, useSalaryPlan } from "@/lib/queries";
 
@@ -81,23 +82,56 @@ export default function HomePage() {
         </button>
       )}
 
-      {/* The salary prompt above covers the "salary not recorded" alert. */}
-      {d && <AlertBanners alerts={d.salary.awaiting ? d.alerts.filter((a) => !a.key.startsWith("salary_missing:")) : d.alerts} />}
+      {/* The salary prompt above covers the "salary not recorded" alert; the card tile shows its utilization. */}
+      {d && <AlertBanners alerts={d.alerts.filter((a) => !(d.salary.awaiting && a.key.startsWith("salary_missing:")) && !a.key.startsWith("card_util:"))} />}
 
+      {/*
+        Laptop: two columns. Phone: one list in the order a glance needs it (what you can spend, what's due,
+        what just happened), so the columns dissolve (`contents`) and each card takes an `order`.
+      */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="min-w-0 space-y-4 lg:col-span-2">
-          {d && <GettingStarted d={d} />}
-          {isPending ? <Skeleton className="h-48 rounded-xl" /> : <SafeToSpend d={d} />}
-          {showPlan && <SalaryPlanCard plan={plan} />}
+        <div className="contents lg:col-span-2 lg:flex lg:min-w-0 lg:flex-col lg:gap-4">
+          {d && (
+            <div className="order-1 lg:order-none empty:hidden">
+              <GettingStarted d={d} />
+            </div>
+          )}
+          <div className="order-2 lg:order-none">{isPending ? <Skeleton className="h-48 rounded-xl" /> : <SafeToSpend d={d} />}</div>
+          {showPlan && (
+            <div className="order-3 lg:order-none">
+              <SalaryPlanCard plan={plan} />
+            </div>
+          )}
           {/* Empty charts on a fresh install are just noise. */}
-          {isPending ? <Skeleton className="h-40 rounded-xl" /> : (d.daily.some((x) => x.spentPaise > 0) || d.cycle.budgetPaise > 0) && <DailyChart d={d} />}
-          {isPending ? <Skeleton className="h-64 rounded-xl" /> : d.byCategory.some((c) => c.spentPaise > 0 || c.limitPaise) && <ByCategory d={d} />}
-          <SavingsCard />
+          {!isPending && (d.daily.some((x) => x.spentPaise > 0) || d.cycle.budgetPaise > 0) && (
+            <div className="order-8 lg:order-none">
+              <DailyChart d={d} />
+            </div>
+          )}
+          {!isPending && d.byCategory.some((c) => c.spentPaise > 0 || c.limitPaise) && (
+            <div className="order-7 lg:order-none">
+              <ByCategory d={d} />
+            </div>
+          )}
+          <div className="order-9 lg:order-none empty:hidden">
+            <SavingsCard />
+          </div>
         </div>
-        <div className="space-y-4">
-          <Balances d={d} loading={isPending} />
-          {d && <Upcoming d={d} />}
-          <Card>
+        <div className="contents lg:flex lg:flex-col lg:gap-4">
+          <div className="order-6 lg:order-none empty:hidden">
+            <Balances d={d} loading={isPending} />
+          </div>
+          {d?.cards.map((status) => (
+            <div key={status.accountId} className="order-4 lg:order-none">
+              <CardBill status={status} />
+            </div>
+          ))}
+          {d && (
+            <div className="order-10 lg:order-none empty:hidden">
+              <Upcoming d={d} />
+            </div>
+          )}
+          <Card className="order-5 lg:order-none">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Recent</CardTitle>
               <Button variant="ghost" size="sm" asChild>
@@ -111,7 +145,7 @@ export default function HomePage() {
                 ? Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="my-2 h-12" />)
                 : d.recent.length === 0
                   ? <p className="py-4 text-center text-sm text-muted-foreground">No transactions yet.</p>
-                  : d.recent.map((t: Txn) => <TxnRow key={t.id} txn={t} onOpen={(txn) => setEditing({ mode: "edit", txn })} />)}
+                  : collapsePairs(d.recent).map((t) => <TxnRow key={t.id} txn={t} onOpen={(txn) => setEditing({ mode: "edit", txn })} />)}
             </CardContent>
           </Card>
         </div>
@@ -282,32 +316,29 @@ function Balances({ d, loading }: { d?: Dashboard; loading: boolean }) {
   // No accounts yet: the getting-started card leads there.
   if (activeAccounts.length === 0) return null;
   return (
-    <>
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Balances</CardTitle>
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/more/accounts">Manage</Link>
-          </Button>
-        </CardHeader>
-        <CardContent className="space-y-2.5">
-          {banks.map((a) => (
-            <div key={a.id} className="flex items-center gap-2 text-sm">
-              <span className="flex-1 truncate">{a.name}</span>
-              <span className="text-xs text-muted-foreground">{a.balance.asOf ? relativeTime(a.balance.asOf) : "not set"}</span>
-              <Money paise={a.balance.balancePaise} className="w-28 text-right font-medium" />
-            </div>
-          ))}
-          {d && (
-            <div className="flex items-center justify-between border-t pt-2.5 text-sm">
-              <span className="text-muted-foreground">{d.bufferPaise > 0 ? "Free after buffer" : "Total"}</span>
-              <Money paise={d.liquidPaise - d.bufferPaise} className="font-semibold" />
-            </div>
-          )}
-        </CardContent>
-      </Card>
-      {d?.cards.map((status) => <CardBill key={status.accountId} status={status} />)}
-    </>
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle>Balances</CardTitle>
+        <Button variant="ghost" size="sm" asChild>
+          <Link to="/more/accounts">Manage</Link>
+        </Button>
+      </CardHeader>
+      <CardContent className="space-y-2.5">
+        {banks.map((a) => (
+          <div key={a.id} className="flex items-center gap-2 text-sm">
+            <span className="flex-1 truncate">{a.name}</span>
+            <span className="text-xs text-muted-foreground">{a.balance.asOf ? relativeTime(a.balance.asOf) : "not set"}</span>
+            <Money paise={a.balance.balancePaise} className="w-28 text-right font-medium" />
+          </div>
+        ))}
+        {d && (
+          <div className="flex items-center justify-between border-t pt-2.5 text-sm">
+            <span className="text-muted-foreground">{d.bufferPaise > 0 ? "Free after buffer" : "Total"}</span>
+            <Money paise={d.liquidPaise - d.bufferPaise} className="font-semibold" />
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

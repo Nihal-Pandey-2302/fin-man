@@ -129,11 +129,13 @@ function SmsSetupCard() {
       <CardHeader>
         <CardTitle>Phone SMS forwarding</CardTitle>
         <CardDescription>
-          MacroDroid: trigger “SMS received”, Select number with regex <code>.*(IDFCFB|INDBNK|HDFCBK).*</code>, content “Excludes” <code>.*(otp|one time password|verification code).*</code> (regex, case-insensitive). Action HTTP Request: POST, content type <b>text/plain</b>, body = the SMS number magic text, a new line, then the SMS message magic text.
+          In MacroDroid: trigger <b>SMS Received</b> → Select number (regex on) and content Excludes (regex, case-insensitive). Action <b>HTTP Request</b>: POST, content type text/plain, with the values below.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <SmsStatus />
+        <CopyRow label="Trigger: senders (regex)" value=".*(IDFCFB|INDBNK|HDFCBK).*" copied={copied} onCopy={copy} />
+        <CopyRow label="Trigger: content excludes (regex)" value=".*(otp|one time password|verification code).*" copied={copied} onCopy={copy} />
         <CopyRow label="URL" value={url} copied={copied} onCopy={copy} />
         <CopyRow label="Header name" value="Authorization" copied={copied} onCopy={copy} />
         {secret ? (
@@ -231,7 +233,9 @@ function NotificationsCard() {
     <Card>
       <CardHeader>
         <CardTitle>Notifications</CardTitle>
-        <CardDescription>A 9 am nudge for card bills, autopays, a missing salary and the review inbox. Install the app to the home screen first on Android.</CardDescription>
+        <CardDescription>
+          9 am reminders (card bill, autopays, salary), a prompt to file each new payment, and a Sunday digest. Install the app to the home screen first on Android.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex flex-wrap gap-2">

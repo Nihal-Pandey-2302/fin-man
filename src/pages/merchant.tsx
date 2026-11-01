@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { post } from "@/lib/api";
+import { collapsePairs } from "@/lib/labels";
 import { useLedgerMutation, useLookups, useMerchant } from "@/lib/queries";
 
 const monthLabel = new Intl.DateTimeFormat("en-IN", { month: "short", timeZone: "UTC" });
@@ -46,7 +47,7 @@ export default function MerchantPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="-mt-2 px-2">
-              {m.transactions.map((t) => (
+              {collapsePairs(m.transactions).map((t) => (
                 <TxnRow key={t.id} txn={t} onOpen={(txn) => setEditing({ mode: "edit", txn })} />
               ))}
               {m.count > m.transactions.length && <p className="px-2 pt-2 text-xs text-muted-foreground">Showing the latest {m.transactions.length}.</p>}

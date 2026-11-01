@@ -5,10 +5,10 @@ import { formatPaise } from "@shared/money";
 import { formatTime } from "@shared/time";
 import { CategoryBadge } from "@/components/category-picker";
 import { Money } from "@/components/money";
-import { isPairedKind, txnTitle } from "@/lib/labels";
+import { isPairedKind, txnTitle, type ListTxn } from "@/lib/labels";
 import { useLookups } from "@/lib/queries";
 
-export const TxnRow = memo(function TxnRow({ txn, onOpen }: { txn: Txn; onOpen?: (t: Txn) => void }) {
+export const TxnRow = memo(function TxnRow({ txn, onOpen }: { txn: ListTxn; onOpen?: (t: Txn) => void }) {
   const { category, account } = useLookups();
   const cat = category(txn.categoryId);
   const acc = account(txn.accountId);
@@ -33,7 +33,7 @@ export const TxnRow = memo(function TxnRow({ txn, onOpen }: { txn: Txn; onOpen?:
         </span>
         <span className="block truncate text-xs text-muted-foreground">
           {[
-            acc?.name,
+            txn.pairedTo ? `${acc?.name} → ${account(txn.pairedTo)?.name}` : acc?.name,
             formatTime(new Date(txn.occurredAt)),
             cat && !paired && txn.merchant ? cat.name : null,
             txn.sharePaise !== null ? `your share ${formatPaise(txn.sharePaise)}` : null,

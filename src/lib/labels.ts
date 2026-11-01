@@ -41,3 +41,29 @@ export function txnTitle(t: Txn, categoryName?: string) {
   if (t.kind === "expense") return "Payment";
   return KIND_LABEL[t.kind];
 }
+
+export type ListTxn = Txn & {
+  /** For a transfer / card payment shown as one row: the account the money went to. */
+  pairedTo?: number;
+};
+
+/**
+ * Show each transfer or card bill payment once: the debit leg stays (from), the matching credit leg in the
+ * same list is folded into it (to). A leg whose partner isn't in the list (paging) is shown as it is.
+ */
+export function collapsePairs(txns: Txn[]): ListTxn[] {
+  const credits = new Map<string, Txn>();
+  const debits = new Set<string>();
+  for (const t of txns) {
+    if (!t.transferGroupId) continue;
+    if (t.direction === "credit") credits.set(t.transferGroupId, t);
+    else debits.add(t.transferGroupId);
+  }
+  const out: ListTxn[] = [];
+  for (const t of txns) {
+    const g = t.transferGroupId;
+    if (g && t.direction === "credit" && debits.has(g)) continue;
+    out.push(g && t.direction === "debit" && credits.has(g) ? { ...t, pairedTo: credits.get(g)!.accountId } : t);
+  }
+  return out;
+}

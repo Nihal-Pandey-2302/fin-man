@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useIsDesktop } from "@/hooks/use-media-query";
-import { KIND_LABEL } from "@/lib/labels";
+import { KIND_LABEL, collapsePairs, type ListTxn } from "@/lib/labels";
 import { useBootstrap, useLookups, useTransactions, type TxnFilters } from "@/lib/queries";
 
 export function ActivityLayout() {
@@ -59,13 +59,14 @@ export default function TransactionsPage() {
 
   // Group by IST day, with the day's spending total.
   const groups = useMemo(() => {
-    const out: { date: string; spent: number; items: Txn[] }[] = [];
-    for (const t of items) {
+    const out: { date: string; spent: number; items: ListTxn[] }[] = [];
+    for (const t of collapsePairs(items)) {
       const date = istDate(new Date(t.occurredAt));
       let g = out.at(-1);
       if (!g || g.date !== date) out.push((g = { date, spent: 0, items: [] }));
       g.items.push(t);
-      if (SPEND_KINDS.has(t.kind) && t.direction === "debit") g.spent += t.amountPaise;
+      // Same as SPEND on the server: a split payment counts only your share.
+      if (SPEND_KINDS.has(t.kind) && t.direction === "debit") g.spent += t.sharePaise ?? t.amountPaise;
       if (t.kind === "refund" && t.direction === "credit") g.spent -= t.amountPaise;
     }
     return out;
