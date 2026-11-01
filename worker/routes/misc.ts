@@ -8,7 +8,7 @@ import * as schema from "../db/schema";
 import { buildAlerts } from "../ledger/alerts";
 import { buildDashboard, reviewCount } from "../ledger/dashboard";
 import { buildReport } from "../ledger/report";
-import { BACKUP_PREFIX, dumpTables, listBackups, type BackupEnv } from "../backup";
+import { BACKUP_PREFIX, dumpTables, listBackups, runBackup, type BackupEnv } from "../backup";
 import { findRecurring } from "../ledger/recurring";
 import { buildSavings } from "../ledger/savings";
 import { buildSalaryPlan } from "../ledger/salary-plan";
@@ -103,6 +103,12 @@ export const miscRoutes = new Hono<AppEnv>()
   .get("/backups", async (c) => {
     const kv = (c.env as Env & BackupEnv).BACKUPS;
     return c.json({ configured: !!kv, backups: kv ? await listBackups(kv) : [] });
+  })
+  /** "Back up now" (e.g. before a big change); same as the weekly run, so today's copy is replaced. */
+  .post("/backups/run", async (c) => {
+    const kv = (c.env as Env & BackupEnv).BACKUPS;
+    if (!kv) return c.json({ error: "not_configured" }, 503);
+    return c.json(await runBackup(c.var.db, kv));
   })
   .get("/backups/:date", zValidator("param", z.object({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) })), async (c) => {
     const kv = (c.env as Env & BackupEnv).BACKUPS;

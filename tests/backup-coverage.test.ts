@@ -50,6 +50,10 @@ describe("weekly automatic backups", () => {
     expect((await res.json()) as object).toHaveProperty("tables");
     expect((await api("/backups/2020-01-01")).status).toBe(404);
     expect((await api("/backups", { auth: false })).status).toBe(401);
+    // Back up now.
+    const run = (await (await api("/backups/run", { method: "POST" })).json()) as { key: string };
+    expect(run.key).toMatch(/^backup:\d{4}-\d{2}-\d{2}$/);
+    expect((await api("/backups/run", { method: "POST", auth: false })).status).toBe(401);
   });
 
   it("runs on the cron that wrangler.jsonc schedules", () => {

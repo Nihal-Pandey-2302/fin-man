@@ -21,6 +21,13 @@
 			"migrations_dir": "migrations"
 		}
 	],
+	// Weekly automatic backups (worker/backup.ts). An identifier, not a secret.
+	"kv_namespaces": [
+		{
+			"binding": "BACKUPS",
+			"id": "99e250c989854856a4703c8ed53669c3"
+		}
+	],
 	// 03:30 UTC = 09:00 IST: daily reminders (card due, autopays, salary, review inbox).
 	// Sat 21:00 UTC = Sun 02:30 IST: weekly backup into Workers KV (BACKUPS binding, see worker/backup.ts).
 	"triggers": {

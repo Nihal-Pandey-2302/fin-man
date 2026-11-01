@@ -337,7 +337,8 @@ function PresetsCard() {
 
 /** The weekly automatic backup (Workers KV, last 12 kept). */
 function AutoBackups() {
-  const { data } = useQuery({
+  const [running, setRunning] = useState(false);
+  const { data, refetch } = useQuery({
     queryKey: ["backups"],
     queryFn: () => api<{ configured: boolean; backups: { date: string; bytes: number | null }[] }>("/backups"),
     staleTime: 10 * 60_000,
@@ -345,8 +346,8 @@ function AutoBackups() {
   if (!data) return null;
   const last = data.backups[0];
   return (
-    <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-3 text-sm">
-      <span className="min-w-0 flex-1">
+    <div className="flex flex-wrap items-center gap-2 rounded-lg bg-muted/50 p-3 text-sm">
+      <span className="min-w-0 flex-1 basis-full sm:basis-auto">
         <span className="block font-medium">Automatic backups</span>
         <span className="block text-xs text-muted-foreground">
           {!data.configured
@@ -356,6 +357,25 @@ function AutoBackups() {
               : "Weekly, Sunday 2:30 am · the first one runs this Sunday."}
         </span>
       </span>
+      {data.configured && (
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={running}
+          onClick={async () => {
+            setRunning(true);
+            try {
+              await post("/backups/run");
+              toast.success("Backed up");
+              await refetch();
+            } finally {
+              setRunning(false);
+            }
+          }}
+        >
+          Back up now
+        </Button>
+      )}
       {last && (
         <Button variant="outline" size="sm" asChild>
           <a href={`/api/backups/${last.date}`} download>
