@@ -42,6 +42,11 @@ const EXPORT_TABLES = {
 };
 
 export const miscRoutes = new Hono<AppEnv>()
+  /** The ingest secret, so the owner can copy it into MacroDroid from Settings (behind the login; never cached). */
+  .get("/sms-forwarding", (c) => {
+    c.header("Cache-Control", "no-store");
+    return c.json({ secret: c.env.INGEST_SECRET || null });
+  })
   /** Everything the app shell needs in one round trip. */
   .get("/bootstrap", async (c) => {
     const db = c.var.db;

@@ -48,7 +48,8 @@ export default defineConfig({
         runtimeCaching: [
           {
             // Last-known numbers when offline; always fresh when online.
-            urlPattern: ({ url, request }) => url.pathname.startsWith("/api/") && request.method === "GET" && !url.pathname.startsWith("/api/export"),
+            urlPattern: ({ url, request }) =>
+              url.pathname.startsWith("/api/") && request.method === "GET" && !url.pathname.startsWith("/api/export") && url.pathname !== "/api/sms-forwarding",
             handler: "NetworkFirst",
             options: { cacheName: "api", networkTimeoutSeconds: 5, expiration: { maxEntries: 60, maxAgeSeconds: 7 * 86_400 } },
           },

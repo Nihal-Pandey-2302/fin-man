@@ -1,4 +1,4 @@
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, BellOff, Check, Copy, Download, LogOut, Moon, Plus, Sun, SunMoon, Trash2 } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
@@ -110,6 +110,8 @@ function SmsSetupCard() {
   const [copied, setCopied] = useState<string | null>(null);
   const url = `${location.origin}/api/ingest/sms`;
   const body = `{"sender":"[sms_number]","body":"[sms_message]","received_at":"[sms_time]"}`;
+  const { data: forwarding } = useQuery({ queryKey: ["sms-forwarding"], queryFn: () => api<{ secret: string | null }>("/sms-forwarding"), staleTime: Infinity });
+  const secret = forwarding?.secret;
   const copy = async (label: string, text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -130,7 +132,12 @@ function SmsSetupCard() {
       <CardContent className="space-y-3">
         <SmsStatus />
         <CopyRow label="URL" value={url} copied={copied} onCopy={copy} />
-        <CopyRow label="Header" value="Authorization: Bearer <INGEST_SECRET>" copied={copied} onCopy={copy} />
+        <CopyRow label="Header name" value="Authorization" copied={copied} onCopy={copy} />
+        {secret ? (
+          <CopyRow label="Header value" value={`Bearer ${secret}`} shown={`Bearer ••••••••${secret.slice(-4)}`} copied={copied} onCopy={copy} />
+        ) : (
+          <CopyRow label="Header value" value="Bearer <INGEST_SECRET>" copied={copied} onCopy={copy} />
+        )}
         <CopyRow label="JSON body" value={body} copied={copied} onCopy={copy} />
         <p className="text-xs text-muted-foreground">Turn off battery optimisation for MacroDroid and enable retry on network failure. Duplicates are harmless — every SMS is stored once.</p>
       </CardContent>
@@ -138,12 +145,13 @@ function SmsSetupCard() {
   );
 }
 
-function CopyRow({ label, value, copied, onCopy }: { label: string; value: string; copied: string | null; onCopy: (label: string, text: string) => void }) {
+/** `shown` replaces what's displayed (e.g. a masked secret); the copy button always copies `value`. */
+function CopyRow({ label, value, shown, copied, onCopy }: { label: string; value: string; shown?: string; copied: string | null; onCopy: (label: string, text: string) => void }) {
   return (
     <div className="space-y-1">
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
       <div className="flex gap-2">
-        <code className="min-w-0 flex-1 truncate rounded-md bg-muted px-2 py-1.5 text-xs">{value}</code>
+        <code className="min-w-0 flex-1 truncate rounded-md bg-muted px-2 py-1.5 text-xs">{shown ?? value}</code>
         <Button type="button" variant="ghost" size="icon" className="size-8" aria-label={`Copy ${label}`} onClick={() => onCopy(label, value)}>
           {copied === label ? <Check /> : <Copy />}
         </Button>

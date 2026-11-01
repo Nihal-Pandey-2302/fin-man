@@ -55,3 +55,12 @@ describe("auth", () => {
     expect(res.headers.get("set-cookie")).toMatch(/ft_session=;.*Max-Age=0/);
   });
 });
+
+describe("SMS forwarding setup", () => {
+  it("shows the ingest secret only to the signed-in owner, uncached", async () => {
+    expect((await api("/sms-forwarding", { auth: false })).status).toBe(401);
+    const res = await api("/sms-forwarding");
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(await res.json()).toEqual({ secret: "test-ingest-secret" });
+  });
+});
