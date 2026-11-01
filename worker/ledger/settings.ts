@@ -19,6 +19,8 @@ export const SETTING_DEFAULTS = {
   savings_account_id: null as number | null,
   /** Push each new SMS transaction that needs a category, with category buttons. */
   notify_new_txns: true,
+  /** Recurring-payment suggestions the owner said aren't recurring (merchant keys). */
+  dismissed_recurring: [] as string[],
 };
 export type Settings = typeof SETTING_DEFAULTS;
 export type SettingKey = keyof Settings;

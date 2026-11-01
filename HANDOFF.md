@@ -84,7 +84,10 @@ Read this first if you're resuming after a context reset. Then read CLAUDE.md an
 3. [x] **Categorise from the notification**: a live SMS that creates a needs_review transaction pushes "−₹X · merchant" with two category buttons (`ledger/notify.ts`). The guesses come from the owner's most-used categories for that direction in the last 90 days, the same account counting double, with defaults otherwise.
    - public/push-sw.js posts `/api/transactions/:id/confirm` from the button, using the cookie, and opens the inbox on failure.
    - Imports never push. Setting `notify_new_txns` has a toggle in Settings → Notifications.
-4. [ ] Subscription/recurring finder: suggest autopays, monthly subscriptions total.
+4. [x] **Recurring finder**: `ledger/recurring.ts` `findRecurring` (GET /api/recurring) scans a year of untracked expense debits grouped by `ruleKey(merchant)`.
+   - It keeps charges within ±10% of the median amount and classifies the median gap: monthly 25–35 days with ≥3 charges, quarterly 80–100 with ≥2, yearly 350–380 with ≥2. Every gap must sit within 0.7–1.3× those bounds, and the payment counts as stopped after 1.5 gaps.
+   - It skips merchants covered by an active autopay's name or matchHint, and keys in setting `dismissed_recurring` (POST /api/recurring/dismiss).
+   - UI: the "Looks recurring" section in Plan → Autopays. Track creates an autopay with `matchHint` = key.
 5. [ ] Automatic weekly backups to R2 (cron), keeping 12.
 6. Later: 6-month trends and unusual-spend alerts, merchant pages, splitting with friends (→ loans), weekly digest push.
 

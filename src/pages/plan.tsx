@@ -9,6 +9,7 @@ import { formatPaise, rupeesToPaise } from "@shared/money";
 import { formatShortDate, istDate } from "@shared/time";
 import { Money } from "@/components/money";
 import { GoalsCard } from "@/components/goals-card";
+import { RecurringSuggestions } from "@/components/recurring-suggestions";
 import { SalaryPlanCard } from "@/components/salary-plan-card";
 import { SalarySheet } from "@/components/salary-sheet";
 import { NativeSelect } from "@/components/native-select";
@@ -268,6 +269,7 @@ function AutopaysCard() {
             ))}
           </div>
         )}
+        <RecurringSuggestions />
       </CardContent>
       <ResponsiveSheet open={editing !== null} onOpenChange={(o) => !o && setEditing(null)} title={editing === "new" ? "New autopay" : "Edit autopay"}>
         {editing !== null && (

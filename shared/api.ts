@@ -105,6 +105,28 @@ export type Savings = {
   goalsMonthlyPaise: number;
 };
 
+/** A payment that repeats on a schedule but isn't tracked as an autopay yet (see worker/ledger/recurring.ts). */
+export type Recurring = {
+  key: string;
+  merchant: string;
+  frequency: "monthly" | "quarterly" | "yearly";
+  amountPaise: number;
+  /** The amount spread per month (quarterly ÷ 3, yearly ÷ 12). */
+  monthlyPaise: number;
+  count: number;
+  lastOn: string;
+  nextOn: string;
+  accountId: number;
+  categoryId: number | null;
+};
+
+export type RecurringReport = {
+  found: Recurring[];
+  /** Tracked autopays (not SIPs) spread per month, plus what was found. */
+  trackedMonthlyPaise: number;
+  foundMonthlyPaise: number;
+};
+
 export type Settings = {
   owner_names: string[];
   liquid_buffer_paise: number;
@@ -114,6 +136,7 @@ export type Settings = {
   savings_target_paise: number;
   savings_account_id: number | null;
   notify_new_txns: boolean;
+  dismissed_recurring: string[];
 };
 
 export type Bootstrap = {

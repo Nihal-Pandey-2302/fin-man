@@ -8,9 +8,10 @@ import * as schema from "../db/schema";
 import { buildAlerts } from "../ledger/alerts";
 import { buildDashboard, reviewCount } from "../ledger/dashboard";
 import { buildReport } from "../ledger/report";
+import { findRecurring } from "../ledger/recurring";
 import { buildSavings } from "../ledger/savings";
 import { buildSalaryPlan } from "../ledger/salary-plan";
-import { getSettings, setSetting, type Settings } from "../ledger/settings";
+import { getSetting, getSettings, setSetting, type Settings } from "../ledger/settings";
 import type { AppEnv } from "../types";
 import { listAccounts } from "./accounts";
 
@@ -24,6 +25,7 @@ const settingsSchema = z
     savings_target_paise: z.number().int().min(0),
     savings_account_id: z.number().int().positive().nullable(),
     notify_new_txns: z.boolean(),
+    dismissed_recurring: z.array(z.string().max(120)).max(500),
   })
   .partial();
 
@@ -68,6 +70,15 @@ export const miscRoutes = new Hono<AppEnv>()
   .get("/dashboard", async (c) => c.json(await buildDashboard(c.var.db)))
   .get("/alerts", async (c) => c.json(await buildAlerts(c.var.db)))
   .get("/salary-plan", async (c) => c.json(await buildSalaryPlan(c.var.db)))
+  .get("/recurring", async (c) => c.json(await findRecurring(c.var.db)))
+  /** "Not recurring": stop suggesting this merchant. */
+  .post("/recurring/dismiss", zValidator("json", z.object({ key: z.string().min(1).max(120) })), async (c) => {
+    const db = c.var.db;
+    const current = await getSetting(db, "dismissed_recurring");
+    const key = c.req.valid("json").key;
+    if (!current.includes(key)) await setSetting(db, "dismissed_recurring", [...current, key].slice(-500));
+    return c.json({ dismissed: key });
+  })
   .get("/savings", async (c) => c.json(await buildSavings(c.var.db)))
   .get("/report", zValidator("query", z.object({ start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() })), async (c) =>
     c.json(await buildReport(c.var.db, c.req.valid("query").start)),
