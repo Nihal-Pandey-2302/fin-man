@@ -19,7 +19,8 @@ createRoot(document.getElementById("root")!).render(
         <AuthGate>
           <App />
         </AuthGate>
-        <Toaster position="top-center" richColors closeButton />
+        {/* Bottom, above the phone tab bar: at the top they covered page headers (the back button). */}
+        <Toaster position="bottom-center" richColors closeButton mobileOffset={{ bottom: "calc(5.5rem + env(safe-area-inset-bottom))" }} />
       </QueryClientProvider>
     </ThemeProvider>
   </StrictMode>,

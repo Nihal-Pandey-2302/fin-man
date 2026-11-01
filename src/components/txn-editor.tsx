@@ -1,6 +1,8 @@
 import { Trash2, Unlink } from "lucide-react";
 import { useState, type FormEvent } from "react";
+import { useNavigate } from "react-router";
 import type { Kind, Sms, Txn } from "@shared/api";
+import { merchantPath } from "@shared/merchant";
 import { formatPaise, rupeesToPaise } from "@shared/money";
 import { fromIstInput, toIstInput } from "@shared/time";
 import { CategoryPicker } from "@/components/category-picker";
@@ -56,6 +58,7 @@ export function TxnEditor({ target, onClose }: Props) {
 
 function EditorForm({ target, onDone }: { target: EditorTarget; onDone: () => void }) {
   const { activeCategories, activeAccounts, accounts } = useLookups();
+  const navigate = useNavigate();
   const initial: Partial<Txn> =
     target.mode === "edit" ? target.txn : { direction: "debit", kind: "expense", ...smsDefaults(target.sms), ...target.defaults };
   const cash = activeAccounts.find((a) => a.kind === "cash");
@@ -176,6 +179,19 @@ function EditorForm({ target, onDone }: { target: EditorTarget; onDone: () => vo
       <div className="space-y-1.5">
         <Label htmlFor="merchant">{direction === "debit" ? "Paid to" : "Received from"}</Label>
         <Input id="merchant" value={merchant} onChange={(e) => setMerchant(e.target.value)} placeholder="Merchant or person" className="h-11 md:h-9" />
+        {target.mode === "edit" && target.txn.merchant && (
+          <button
+            type="button"
+            // Close the sheet first: navigating away with it open can leave the page inert.
+            onClick={() => {
+              onDone();
+              navigate(merchantPath(target.txn.merchant!));
+            }}
+            className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+          >
+            All payments to {target.txn.merchant} →
+          </button>
+        )}
       </div>
 
       {kind === "income" && (

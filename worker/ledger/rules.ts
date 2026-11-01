@@ -5,18 +5,9 @@ import { merchantRules, transactions, type TXN_KINDS } from "../db/schema";
 export type Rule = typeof merchantRules.$inferSelect;
 type Kind = (typeof TXN_KINDS)[number];
 
-const SUFFIXES = /\b(?:pvt|private|ltd|limited|llp|india|inc|co)\b\.?/g;
+import { ruleKey } from "../../shared/merchant";
 
-/** Stable rule key for a merchant name: "HDFC SECURITIES LTD" → "hdfc securities", "ETERNAL LIMITED" → "eternal". */
-export function ruleKey(merchant: string): string {
-  const key = merchant
-    .toLowerCase()
-    .replace(/[^a-z0-9@._\s-]/g, " ")
-    .replace(SUFFIXES, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  return key || merchant.toLowerCase().trim();
-}
+export { ruleKey };
 
 /** Best rule for a merchant/VPA: the longest matching pattern wins (most specific). */
 export function findRule(rules: Rule[], merchant: string | null, vpa: string | null): Rule | null {

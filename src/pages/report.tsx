@@ -1,7 +1,9 @@
 import { CircleHelp, TrendingDown, TrendingUp } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router";
 import { cn } from "cn";
 import type { Report } from "@shared/api";
+import { merchantPath } from "@shared/merchant";
 import { formatPaise } from "@shared/money";
 import { formatShortDate } from "@shared/time";
 import { NativeSelect } from "@/components/native-select";
@@ -51,12 +53,12 @@ export default function ReportPage() {
             <CardContent className="space-y-2">
               {r.topMerchants.length === 0 && <p className="text-sm text-muted-foreground">No merchant spends.</p>}
               {r.topMerchants.map((m, i) => (
-                <div key={m.merchant} className="flex items-center gap-3 text-sm">
+                <Link key={m.merchant} to={merchantPath(m.merchant)} className="-mx-2 flex items-center gap-3 rounded-md px-2 py-1 text-sm hover:bg-muted/60">
                   <span className="w-5 text-muted-foreground tabular-nums">{i + 1}</span>
                   <span className="flex-1 truncate">{m.merchant}</span>
                   <span className="text-xs text-muted-foreground">{m.count}×</span>
                   <span className="w-24 text-right font-medium tabular-nums">{formatPaise(m.spendPaise)}</span>
-                </div>
+                </Link>
               ))}
             </CardContent>
           </Card>

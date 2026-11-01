@@ -96,7 +96,11 @@ Read this first if you're resuming after a context reset. Then read CLAUDE.md an
    - Restore: `npm run restore -- <file> [--remote]` (scripts/restore.mjs) → safety backup, `restoreStatements()` from shared/backup-sql.ts, row-count check. Backups are format v2 (raw SQL rows); v1 files (camelCase from the old /api/export) are refused. A round-trip test covers multi-line SMS and quotes.
 6. Later items, in the order the owner agreed:
    a. [x] **Weekly digest**: `ledger/digest.ts` `buildDigest`/`digestNote` on cron `0 14 * * SUN` (Sun 19:30 IST). It covers the week's SPEND against the week before, the top category, the cycle left and per-day amount (from buildDashboard), the next 7 days' card bill and autopays, and the review count. Setting `weekly_digest`, with a toggle in Settings → Notifications.
-   b. [ ] Merchant pages (all payments, monthly totals, average, rule editing).
+   b. [x] **Merchant pages**: /merchant/:key, keyed by `ruleKey` (moved to shared/merchant.ts; `merchantPath()` builds the link).
+      - `ledger/merchants.ts`: `merchantTransactions` narrows by the key's longest word with LIKE, then compares exact keys in JS. `merchantDetail` returns totals, the average, 12 months, the most used category, the effective rule and the latest 100 payments. `setMerchantCategory` learns the rule and optionally re-files past payments, leaving transfers alone.
+      - Routes: GET /api/merchants/:key and POST /:key/category.
+      - Ways in: "All payments to X →" in the txn editor (it closes the sheet first) and the Report's top merchants.
+      - Toasts moved to bottom-center with mobileOffset above the tab bar; at the top they covered page headers.
    c. [ ] Split with friends (your share as spending, the rest becomes an IOU in loans).
    d. [ ] Trends and unusual-spend alerts (6-month category chart in Report; alert when a category runs well above its usual level). Needs 2–3 cycles of data.
 

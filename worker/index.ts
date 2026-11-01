@@ -5,6 +5,7 @@ import { DIGEST_CRON, runDigest } from "./ledger/digest";
 import { getDb } from "./db";
 import { accountRoutes } from "./routes/accounts";
 import { cardRoutes } from "./routes/cards";
+import { merchantRoutes } from "./routes/merchants";
 import { authRoutes, requireSession } from "./routes/auth";
 import { categoryRoutes, ruleRoutes } from "./routes/categories";
 import { importRoutes } from "./routes/import";
@@ -34,6 +35,7 @@ app
   .route("/ingest", ingestRoutes)
   .route("/accounts", accountRoutes)
   .route("/cards", cardRoutes)
+  .route("/merchants", merchantRoutes)
   .route("/categories", categoryRoutes)
   .route("/rules", ruleRoutes)
   .route("/transactions", transactionRoutes)

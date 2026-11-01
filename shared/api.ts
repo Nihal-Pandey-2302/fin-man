@@ -127,6 +127,29 @@ export type RecurringReport = {
   foundMonthlyPaise: number;
 };
 
+/** Everything about one merchant (all spellings that share a rule key). */
+export type MerchantDetail = {
+  key: string;
+  /** The most recent spelling, for display. */
+  name: string;
+  count: number;
+  /** Spending (expense + fee, minus refunds) and money received, all time. */
+  spentPaise: number;
+  receivedPaise: number;
+  /** Average spending payment. */
+  avgPaise: number;
+  firstOn: string;
+  lastOn: string;
+  /** The last 12 months, oldest first ("YYYY-MM"). */
+  monthly: { month: string; spentPaise: number }[];
+  /** Most used category for this merchant. */
+  categoryId: number | null;
+  /** The rule that files new payments from it (the most specific match), if any. */
+  rule: Rule | null;
+  /** Newest first, up to 100. */
+  transactions: Txn[];
+};
+
 export type Settings = {
   owner_names: string[];
   liquid_buffer_paise: number;
