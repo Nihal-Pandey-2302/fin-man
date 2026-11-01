@@ -9,7 +9,7 @@ import { accounts, DIRECTIONS, INCOME_SOURCES, smsRaw, transactions, TXN_KINDS, 
 import { unpairGroup } from "../ledger/matcher";
 import { unmatchAutopay } from "../ledger/autopays";
 import { detectSalary, unlinkSalary } from "../ledger/salary";
-import { adoptManualTwin } from "../ledger/twins";
+import { adoptManualTwin, findOpenLeg } from "../ledger/twins";
 import { settleNewTransaction } from "../ledger/settle";
 import { applyRuleToUncategorized, learnRule } from "../ledger/rules";
 import { processSms } from "../sms/ingest";
@@ -238,7 +238,10 @@ const transferSchema = z
   .refine((t) => t.fromAccountId !== t.toAccountId, { message: "accounts must differ", path: ["toAccountId"] });
 
 export const transferRoutes = new Hono<AppEnv>()
-  /** Manual transfer between own accounts (e.g. ATM cash → Cash), or a card bill payment. */
+  /**
+   * Manual transfer between own accounts (e.g. ATM cash → Cash), or a card bill payment. A leg whose SMS
+   * already arrived (e.g. the HDFC debit for a card bill, when the card sends no SMS) is reused, not duplicated.
+   */
   .post("/", zValidator("json", transferSchema), async (c) => {
     const body = c.req.valid("json");
     const db = c.var.db;
@@ -248,14 +251,25 @@ export const transferRoutes = new Hono<AppEnv>()
     const kind = to.kind === "credit_card" ? "card_payment" : "transfer";
     const groupId = crypto.randomUUID();
     const occurredAt = body.occurredAt ? new Date(body.occurredAt) : new Date();
-    const base = { amountPaise: body.amountPaise, kind, occurredAt, note: body.note ?? null, source: "manual", transferGroupId: groupId, status: "confirmed" } as const;
-    const rows = await db
-      .insert(transactions)
-      .values([
-        { ...base, accountId: body.fromAccountId, direction: "debit" },
-        { ...base, accountId: body.toAccountId, direction: "credit" },
-      ])
-      .returning();
+    const legs = [
+      { accountId: body.fromAccountId, direction: "debit" as const },
+      { accountId: body.toAccountId, direction: "credit" as const },
+    ];
+    const rows = [];
+    for (const leg of legs) {
+      const existing = await findOpenLeg(db, { ...leg, amountPaise: body.amountPaise, at: occurredAt });
+      const [row] = existing
+        ? await db
+            .update(transactions)
+            .set({ kind, transferGroupId: groupId, categoryId: null, status: "confirmed", ...(body.note && !existing.note && { note: body.note }) })
+            .where(eq(transactions.id, existing.id))
+            .returning()
+        : await db
+            .insert(transactions)
+            .values({ ...leg, amountPaise: body.amountPaise, kind, occurredAt, note: body.note ?? null, source: "manual", transferGroupId: groupId, status: "confirmed" })
+            .returning();
+      rows.push(row);
+    }
     return c.json({ groupId, transactions: rows }, 201);
   })
   .post("/:groupId/unpair", zValidator("param", z.object({ groupId: z.uuid() })), async (c) => {

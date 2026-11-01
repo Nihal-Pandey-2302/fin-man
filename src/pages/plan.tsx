@@ -404,8 +404,9 @@ function AutopayForm({ initial, onDone }: { initial: Autopay | null; onDone: () 
               type="button"
               variant="outline"
               onClick={async () => {
-                await post(`/autopays/${initial.id}/paid`);
-                toast.success("Marked paid · next due moved forward");
+                const r = await post<Autopay & { linked: boolean }>(`/autopays/${initial.id}/paid`);
+                toast.success(`${r.linked ? "Matched the debit" : `Recorded ${formatPaise(initial.amountPaise)} paid`} · next due ${formatShortDate(r.nextDueOn)}`);
+                invalidateLedger();
                 onDone();
               }}
             >

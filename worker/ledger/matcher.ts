@@ -39,6 +39,8 @@ const CARD_PAYEE = /credit ?card|\bcard\b|\bcred\b|bill ?desk|idfc first/i;
 /** A rule- or owner-decided transaction is not a pairing candidate. */
 const isPairable = (t: Txn) =>
   t.transferGroupId === null &&
+  // A debit that paid an autopay is spending, never one leg of a transfer.
+  t.autopayId === null &&
   (t.kind === "expense" || t.kind === "income" || t.kind === "refund") &&
   !(t.status === "confirmed" && t.categoryId !== null);
 

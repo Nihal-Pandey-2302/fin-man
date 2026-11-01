@@ -2,7 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { asc, desc, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
-import { istDate, nextDayOfMonth } from "../../shared/time";
+import { istDate, istToUtc, nextDayOfMonth, parseDate } from "../../shared/time";
 import type { Db } from "../db";
 import {
   AUTOPAY_KINDS,
@@ -16,11 +16,16 @@ import {
   loanPayments,
   loans,
   quickAddPresets,
+  transactions,
 } from "../db/schema";
 import { advanceAutopay, autopayCalendar } from "../ledger/autopays";
 import { currentCycle, startCycle } from "../ledger/cycles";
+import { settleNewTransaction } from "../ledger/settle";
+import { findOpenLeg } from "../ledger/twins";
 import type { AppEnv } from "../types";
 import { date, dayOfMonth, id, idParam, paise, text } from "./validators";
+
+const paidSchema = z.object({ paidOn: date.optional(), amountPaise: paise.optional() });
 
 // ---------------- budget cycles ----------------
 const cycleSchema = z.object({
@@ -111,9 +116,32 @@ export const autopayRoutes = new Hono<AppEnv>()
       .returning();
     return row ? c.json(row) : c.json({ error: "not_found" }, 404);
   })
+  /**
+   * Marked paid by hand (its SMS isn't read, e.g. a bank mandate debit): record the debit too, or the money
+   * would silently leave "autopays due" without ever showing up as spent. A matching debit that already
+   * came in by SMS is linked instead of duplicated. The due date moves forward as with an automatic match.
+   */
   .post("/:id/paid", idParam, async (c) => {
-    const row = await advanceAutopay(c.var.db, c.req.valid("param").id);
-    return row ? c.json(row) : c.json({ error: "not_found" }, 404);
+    const db = c.var.db;
+    const parsed = paidSchema.safeParse(await c.req.json().catch(() => ({})));
+    if (!parsed.success) return c.json({ error: "invalid", issues: parsed.error.issues }, 400);
+    const a = await db.select().from(autopays).where(eq(autopays.id, c.req.valid("param").id)).get();
+    if (!a) return c.json({ error: "not_found" }, 404);
+    const today = istDate();
+    // Paid on its due day; if that's still ahead (paid early), today.
+    const paidOn = parsed.data.paidOn ?? (a.nextDueOn <= today ? a.nextDueOn : today);
+    const { y, m, d } = parseDate(paidOn);
+    const occurredAt = paidOn === today ? new Date() : istToUtc(y, m, d, 10, 0);
+    const amountPaise = parsed.data.amountPaise ?? a.amountPaise;
+    const payment = { autopayId: a.id, categoryId: a.categoryId, kind: a.kind === "sip" ? ("investment" as const) : ("expense" as const), status: "confirmed" as const };
+
+    const existing = await findOpenLeg(db, { accountId: a.accountId, direction: "debit", amountPaise, at: occurredAt });
+    const [txn] = existing
+      ? await db.update(transactions).set({ ...payment, categoryId: a.categoryId ?? existing.categoryId }).where(eq(transactions.id, existing.id)).returning()
+      : await db.insert(transactions).values({ ...payment, accountId: a.accountId, amountPaise, direction: "debit", merchant: a.name, occurredAt, source: "manual" }).returning();
+    if (!existing) await settleNewTransaction(db, txn.id);
+    const row = await advanceAutopay(db, a.id);
+    return c.json({ ...row, transactionId: txn.id, linked: !!existing });
   })
   .delete("/:id", idParam, async (c) => {
     await c.var.db.delete(autopays).where(eq(autopays.id, c.req.valid("param").id));

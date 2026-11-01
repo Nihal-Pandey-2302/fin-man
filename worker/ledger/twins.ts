@@ -55,3 +55,29 @@ export async function adoptManualTwin(db: Db, t: TwinInput): Promise<number | nu
     .returning({ id: transactions.id });
   return linked?.id ?? null;
 }
+
+/**
+ * The other way round: the owner records money by hand (salary-plan "Record") after its SMS already
+ * created a transaction. Find that transaction so it can be reused: same account, direction and amount,
+ * within ±2 IST days, any source, and not already a transfer leg, an autopay payment or a salary.
+ */
+export async function findOpenLeg(db: Db, leg: { accountId: number; direction: "debit" | "credit"; amountPaise: number; at: Date }) {
+  const day = istDate(leg.at);
+  const candidates = await db
+    .select()
+    .from(transactions)
+    .where(
+      and(
+        eq(transactions.accountId, leg.accountId),
+        eq(transactions.direction, leg.direction),
+        eq(transactions.amountPaise, leg.amountPaise),
+        isNull(transactions.transferGroupId),
+        isNull(transactions.autopayId),
+        isNull(transactions.incomeSource),
+        gte(transactions.occurredAt, istDayStart(addDays(day, -TWIN_WINDOW_DAYS))),
+        lt(transactions.occurredAt, istDayStart(addDays(day, TWIN_WINDOW_DAYS + 1))),
+      ),
+    )
+    .all();
+  return candidates.sort((a, b) => Math.abs(+a.occurredAt - +leg.at) - Math.abs(+b.occurredAt - +leg.at))[0] ?? null;
+}

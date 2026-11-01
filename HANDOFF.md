@@ -65,7 +65,9 @@ Read this first if you're resuming after a context reset. Then read CLAUDE.md an
 - [x] **Manual salary + manual/SMS twins** (2026-11-01):
   - The owner has no salary-SMS sample yet, so salary is recorded by hand. Home shows a "Salary in?" prompt from the 25th to the 10th until one is recorded. Plan has a **Salary received** button, and the `/?salary=1` deep link (used by the salary_missing alert and push) opens the sheet.
   - `worker/ledger/twins.ts` `adoptManualTwin` links a later SMS to a hand-made entry with the same account, direction and amount within ±2 IST days. It's used by ingest and by "create from SMS" in Review. Without it, the salary-plan "Record" transfers and manual salary were double-counted once the SMS arrived.
-  - The owner has **no HDFC debit card**, so no ATM or debit-card formats are needed.
+  - Cards: the owner has **no HDFC credit card** (yet). They have debit cards but rarely use them and pay by UPI, so debit-card and ATM SMS are rare: they land in Review and need no parser for now.
+  - The IDFC card has had no bill payment yet (first cycle), so there's no "payment received" sample. Until there is, the salary-plan **Record** (POST /transfers) reuses the HDFC debit SMS already in the ledger (`findOpenLeg`) and adds the card's credit leg, so the bill isn't counted as spending.
+  - Indian Bank autopays: the owner marks them paid by hand. `POST /autopays/:id/paid` now records the debit (linked, with the autopay's category), or links a matching SMS debit if one exists. Before this change it only moved the due date, so the money vanished from "autopays due" without ever counting as spent.
   - The RuPay (UPI) card SMS uses the same format as the Mastercard one (already in the fixtures).
 
 ## Waiting on the owner

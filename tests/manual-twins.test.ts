@@ -89,3 +89,61 @@ describe("dashboard salary prompt", () => {
     expect((await buildDashboard(db, ist(2026, 12, 29))).salary.awaiting).toBe(true);
   });
 });
+
+describe("recording by hand after the SMS", () => {
+  it("salary-plan Record reuses the bank debit for a card bill the card never texted about", async () => {
+    const { hdfc, card } = await seedAccounts();
+    const bill = fixture("hdfc/upi_debit.txt").replace("HDFC SECURITIES LTD", "IDFC FIRST BANK CREDIT CARD");
+    const sms = await json<{ transactionId: number }>(postSms("AD-HDFCBK-S", bill, +ist(2026, 10, 27, 20)));
+    await api("/transfers", { method: "POST", json: { fromAccountId: hdfc.id, toAccountId: card.id, amountPaise: 52_000, occurredAt: ist(2026, 10, 27, 21).toISOString() } });
+
+    const txns = await allTxns();
+    expect(txns).toHaveLength(2);
+    const debit = txns.find((t) => t.id === sms.transactionId)!;
+    const credit = txns.find((t) => t.accountId === card.id)!;
+    expect(debit).toMatchObject({ kind: "card_payment", status: "confirmed", categoryId: null });
+    expect(credit).toMatchObject({ kind: "card_payment", direction: "credit", source: "manual", transferGroupId: debit.transferGroupId });
+    // Not spending.
+    const d = await buildDashboard(db, ist(2026, 10, 28));
+    expect(d.daily.reduce((s, x) => s + x.spentPaise, 0)).toBe(0);
+  });
+});
+
+describe("autopay marked paid by hand", () => {
+  const autopay = (accountId: number, amountPaise: number, nextDueOn: string, kind = "emi") =>
+    json<{ id: number }>(api("/autopays", { method: "POST", json: { name: "Car rental EMI", kind, accountId, amountPaise, dayOfMonth: Number(nextDueOn.slice(8)), nextDueOn } }));
+
+  it("records the debit on its due day, links it, and undoes cleanly", async () => {
+    const { indian } = await seedAccounts();
+    const a = await autopay(indian.id, 578_100, "2026-10-30");
+    const r = await json<{ nextDueOn: string; transactionId: number; linked: boolean }>(api(`/autopays/${a.id}/paid`, { method: "POST", json: {} }));
+    expect(r).toMatchObject({ nextDueOn: "2026-11-30", linked: false });
+
+    const [t] = await allTxns();
+    expect(t).toMatchObject({ id: r.transactionId, accountId: indian.id, amountPaise: 578_100, direction: "debit", kind: "expense", autopayId: a.id, transferGroupId: null });
+    expect(+t.occurredAt).toBe(+ist(2026, 10, 30));
+
+    await api(`/transactions/${t.id}`, { method: "DELETE" });
+    expect((await db.select().from(schema.autopays).where(eq(schema.autopays.id, a.id)).get())?.nextDueOn).toBe("2026-10-30");
+  });
+
+  it("links a debit that already came in by SMS instead of adding another", async () => {
+    const { indian } = await seedAccounts();
+    const sms = await json<{ transactionId: number }>(postSms("AD-INDBNK-S", fixture("indian/upi_debit.txt"), +ist(2026, 8, 1, 12)));
+    // Due a week after the debit: too far for the automatic match, so it stayed a plain expense.
+    const a = await autopay(indian.id, 157_800, "2026-08-08");
+    expect((await allTxns())[0].autopayId).toBeNull();
+    const r = await json<{ linked: boolean; transactionId: number }>(api(`/autopays/${a.id}/paid`, { method: "POST", json: { paidOn: "2026-08-01" } }));
+    expect(r).toMatchObject({ linked: true, transactionId: sms.transactionId });
+    const txns = await allTxns();
+    expect(txns).toHaveLength(1);
+    expect(txns[0]).toMatchObject({ autopayId: a.id, status: "confirmed" });
+  });
+
+  it("a SIP marked paid is an investment, not spending", async () => {
+    const { indian } = await seedAccounts();
+    const a = await autopay(indian.id, 500_000, "2026-10-10", "sip");
+    await api(`/autopays/${a.id}/paid`, { method: "POST", json: {} });
+    expect((await allTxns())[0].kind).toBe("investment");
+  });
+});
