@@ -70,6 +70,17 @@ Read this first if you're resuming after a context reset. Then read CLAUDE.md an
   - Indian Bank autopays: the owner marks them paid by hand. `POST /autopays/:id/paid` now records the debit (linked, with the autopay's category), or links a matching SMS debit if one exists. Before this change it only moved the due date, so the money vanished from "autopays due" without ever counting as spent.
   - The RuPay (UPI) card SMS uses the same format as the Mastercard one (already in the fixtures).
 
+## Roadmap (owner approved 2026-11-01: build all, one by one)
+1. [x] **Card bill guard**: `ledger/cards.ts` `cardStatus()` covers the last statement, due date, statement amount (the bank figure from `card_statements`, else computed from the last card-SMS or entered balance before the cut-off), paid since, left to pay, utilization and spends since.
+   - Alerts: card_due (≤3 days), card_overdue, card_util ≥30%. card_util is `quiet` (Home only) except on statement day.
+   - The salary plan's card_bill uses the amount left to pay.
+   - Home `CardBill` tile has "Enter statement" and "I've paid it from HDFC" (POST /transfers reuses the SMS debit). PUT /api/cards/:id/statement. Migration 0005.
+2. [ ] Pay yourself first: a savings step in the salary plan, savings rate and emergency-fund months on Home, goals and set-asides excluded from safe-to-spend.
+3. [ ] Categorise from the push notification: an action button with the top category guesses.
+4. [ ] Subscription/recurring finder: suggest autopays, monthly subscriptions total.
+5. [ ] Automatic weekly backups to R2 (cron), keeping 12.
+6. Later: 6-month trends and unusual-spend alerts, merchant pages, splitting with friends (→ loans), weekly digest push.
+
 ## Waiting on the owner
 1. ~~SMS sender IDs~~ received 2026-11-01: IDFCFB (AX-/AD-/CP-), INDBNK (BV-/VM-, -S/-T), HDFCBK (JK-). They're the allowlist in worker/sms/senders.ts. A bank-looking SMS from any other sender is stored as `unknown_sender:<ID>` and waits in Review; it's never auto-parsed and is skipped by bulk reprocess. IDFC also sends a monthly "interest credited" SMS (from AD-IDFCFB-S); there's no sample yet, so it lands in Review.
 2. **More SMS samples**, still useful: card "payment received", the Indian Bank autopay debit itself, and the HDFC→IDFC/Indian transfer if it isn't UPI. The salary SMS is optional now that salary entry is manual. Add a fixture and an expectation for each, then a parser rule.

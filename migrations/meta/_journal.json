@@ -36,6 +36,13 @@
       "when": 1793486804952,
       "tag": "0004_sms_received_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1793545545145,
+      "tag": "0005_card_statements",
+      "breakpoints": true
     }
   ]
 }

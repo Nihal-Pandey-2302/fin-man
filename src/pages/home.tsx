@@ -1,4 +1,4 @@
-import { AlertCircle, ArrowRight, BriefcaseBusiness, CalendarClock, CircleHelp, CreditCard, Inbox } from "lucide-react";
+import { AlertCircle, ArrowRight, BriefcaseBusiness, CalendarClock, CircleHelp, Inbox } from "lucide-react";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { cn } from "cn";
@@ -6,6 +6,7 @@ import type { Dashboard, Txn } from "@shared/api";
 import { formatPaise } from "@shared/money";
 import { addDays, daysBetween, formatShortDate } from "@shared/time";
 import { AlertBanners } from "@/components/alert-banners";
+import { CardBill } from "@/components/card-bill";
 import { GettingStarted } from "@/components/getting-started";
 import { Money } from "@/components/money";
 import { SalaryPlanCard } from "@/components/salary-plan-card";
@@ -275,7 +276,6 @@ function ByCategory({ d }: { d: Dashboard }) {
 function Balances({ d, loading }: { d?: Dashboard; loading: boolean }) {
   const { activeAccounts } = useLookups();
   const banks = activeAccounts.filter((a) => a.kind !== "credit_card");
-  const cards = activeAccounts.filter((a) => a.kind === "credit_card");
   if (loading) return <Skeleton className="h-56 rounded-xl" />;
   // No accounts yet: the getting-started card leads there.
   if (activeAccounts.length === 0) return null;
@@ -304,32 +304,7 @@ function Balances({ d, loading }: { d?: Dashboard; loading: boolean }) {
           )}
         </CardContent>
       </Card>
-      {cards.map((a) => {
-        const due = a.balance.nextDueOn;
-        const daysToDue = due && d ? daysBetween(d.today, due) : null;
-        return (
-          <Card key={a.id}>
-            <CardContent className="space-y-2 py-4">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <CreditCard className="size-4" /> {a.name}
-              </div>
-              <div className="flex items-baseline justify-between">
-                <span className="text-2xl font-semibold tabular-nums">{formatPaise(Math.max(0, a.balance.balancePaise))}</span>
-                <span className="text-xs text-muted-foreground">outstanding</span>
-              </div>
-              <div className="flex justify-between text-xs text-muted-foreground">
-                {a.balance.availableLimitPaise != null && <span>Available {formatPaise(a.balance.availableLimitPaise)}</span>}
-                {due && (
-                  <span className={cn(daysToDue !== null && daysToDue <= 3 && "font-medium text-amber-600 dark:text-amber-400")}>
-                    Due {formatShortDate(due)}
-                    {daysToDue !== null && ` (${daysToDue === 0 ? "today" : `${daysToDue}d`})`}
-                  </span>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
+      {d?.cards.map((status) => <CardBill key={status.accountId} status={status} />)}
     </>
   );
 }

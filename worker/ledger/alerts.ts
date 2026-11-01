@@ -1,5 +1,5 @@
 import { and, desc, eq, gte, max } from "drizzle-orm";
-import type { AccountBalance, Alert } from "../../shared/api";
+import type { AccountBalance, Alert, CardStatus } from "../../shared/api";
 import { formatPaise } from "../../shared/money";
 import { addDays, addMonths, daysBetween, formatShortDate, istDate, istDayStart, parseDate } from "../../shared/time";
 import type { Db } from "../db";
@@ -7,6 +7,7 @@ import { accounts, smsRaw, transactions } from "../db/schema";
 import type { ParsedNotice } from "../sms/parsers";
 import { autopayCalendar, findAutopayForNotice } from "./autopays";
 import { computeBalances } from "./balances";
+import { cardStatuses } from "./cards";
 import { currentCycle, type CurrentCycle } from "./cycles";
 import { getSettings } from "./settings";
 
@@ -26,7 +27,7 @@ const inDays = (n: number) => (n === 0 ? "today" : n === 1 ? "tomorrow" : `in ${
  * salary not in yet, card bill due soon, autopay account short of what's due, autopays due tomorrow,
  * bank autopay heads-ups for mandates that aren't tracked, and SMS forwarding gone quiet.
  */
-type Precomputed = { accountRows: (typeof accounts.$inferSelect)[]; balances: Map<number, AccountBalance>; cycle: CurrentCycle; lastSms: Date | null };
+type Precomputed = { accountRows: (typeof accounts.$inferSelect)[]; balances: Map<number, AccountBalance>; cycle: CurrentCycle; lastSms: Date | null; cards: CardStatus[] };
 
 export async function buildAlerts(db: Db, today = istDate(), pre?: Precomputed): Promise<Alert[]> {
   const alerts: Alert[] = [];
@@ -64,16 +65,42 @@ export async function buildAlerts(db: Db, today = istDate(), pre?: Precomputed):
     }
   }
 
-  // Card bill due soon.
-  for (const card of accountRows.filter((a) => a.kind === "credit_card")) {
+  // Cards: pay the statement in full by the due date (interest otherwise), and keep utilization low.
+  const cards = pre?.cards ?? (await cardStatuses(db, accountRows, balances, today));
+  for (const s of cards) {
+    const card = accountRows.find((a) => a.id === s.accountId)!;
     const b = balances.get(card.id);
-    if (!b?.nextDueOn || b.balancePaise <= 0) continue;
-    const n = daysBetween(today, b.nextDueOn);
-    if (n <= 3) {
-      alerts.push({ key: `card_due:${card.id}:${b.nextDueOn}`, level: n <= 1 ? "danger" : "warn", title: `${card.name} bill due ${inDays(n)}`, body: `${formatPaise(b.balancePaise)} outstanding · due ${formatShortDate(b.nextDueOn)}`, href: "/plan" });
+    if (s.status === "overdue") {
+      alerts.push({ key: `card_overdue:${card.id}:${s.dueDate}`, level: "danger", title: `${card.name} bill overdue`, body: `Pay ${formatPaise(s.leftToPayPaise!)} now to limit interest and late fees (was due ${formatShortDate(s.dueDate!)}).`, href: "/" });
+    } else if (s.status === "due" && s.daysToDue !== null && s.daysToDue <= 3) {
+      alerts.push({
+        key: `card_due:${card.id}:${s.dueDate}`,
+        level: s.daysToDue <= 1 ? "danger" : "warn",
+        title: `Pay ${formatPaise(s.leftToPayPaise!)} on ${card.name} ${inDays(s.daysToDue)}`,
+        body: `Statement of ${formatShortDate(s.statementDate!)}. Pay it in full by ${formatShortDate(s.dueDate!)} to avoid interest.`,
+        href: "/",
+      });
+    } else if (s.status === "unknown" && b?.nextDueOn && b.balancePaise > 0) {
+      // Statement amount unknown: fall back to what's owed in total.
+      const n = daysBetween(today, b.nextDueOn);
+      if (n <= 3) {
+        alerts.push({ key: `card_due:${card.id}:${b.nextDueOn}`, level: n <= 1 ? "danger" : "warn", title: `${card.name} bill due ${inDays(n)}`, body: `${formatPaise(b.balancePaise)} outstanding · due ${formatShortDate(b.nextDueOn)}. Enter the statement amount to see exactly what's due.`, href: "/" });
+      }
     }
-    if (b.nextStatementOn === today) {
-      alerts.push({ key: `card_statement:${card.id}:${today}`, level: "info", title: `${card.name} statement today`, body: `${formatPaise(b.balancePaise)} outstanding`, href: "/more/accounts" });
+    if (b?.nextStatementOn === today) {
+      alerts.push({ key: `card_statement:${card.id}:${today}`, level: "info", title: `${card.name} statement today`, body: `${formatPaise(b.balancePaise)} outstanding`, href: "/" });
+    }
+    if (s.utilization !== null && s.utilization >= 0.3) {
+      const pct = Math.round(s.utilization * 100);
+      alerts.push({
+        key: `card_util:${card.id}:${s.statementDate ?? "none"}`,
+        level: s.utilization >= 0.5 ? "warn" : "info",
+        title: `${card.name} at ${pct}% of its limit`,
+        body: `${formatPaise(s.outstandingPaise)} of ${formatPaise(s.limitPaise!)} used. Under 30% is better for your credit score.`,
+        href: "/",
+        // Pushed once a month (on statement day); otherwise just a banner.
+        quiet: today !== s.statementDate,
+      });
     }
   }
 

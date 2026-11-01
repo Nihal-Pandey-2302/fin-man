@@ -10,6 +10,7 @@ import { sendToAll, type PushNote } from "./push";
 export async function runDaily(db: Db, env: Env, fetcher?: typeof fetch) {
   const [alerts, review] = await Promise.all([buildAlerts(db), reviewCount(db)]);
   const notes: PushNote[] = alerts
+    .filter((a) => !a.quiet)
     .sort((a, b) => rank(b.level) - rank(a.level))
     .slice(0, 4)
     .map((a) => ({ title: a.title, body: a.body, url: a.href ?? "/", tag: a.key }));

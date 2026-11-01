@@ -377,6 +377,31 @@ export const settings = sqliteTable("settings", {
   value: text().notNull(),
 });
 
+/**
+ * A card statement's figures as the bank states them (entered by the owner, later read from the statement SMS).
+ * Without a row, the statement amount is computed from the ledger when it can be (see ledger/cards.ts).
+ */
+export const cardStatements = sqliteTable(
+  "card_statements",
+  {
+    id: id(),
+    accountId: integer()
+      .notNull()
+      .references(() => accounts.id, { onDelete: "cascade" }),
+    /** The statement (bill generation) date, YYYY-MM-DD IST. */
+    statementDate: text().notNull(),
+    /** Total amount due on that statement (0 when nothing is due). */
+    amountPaise: integer().notNull(),
+    minDuePaise: integer(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [
+    uniqueIndex("card_statements_account_date_uq").on(t.accountId, t.statementDate),
+    check("card_statements_amount_nonneg", sql`${t.amountPaise} >= 0`),
+  ],
+);
+
 /** Browser push subscriptions (one per installed device/browser). */
 export const pushSubscriptions = sqliteTable(
   "push_subscriptions",

@@ -5,6 +5,7 @@ import type { Db } from "../db";
 import { accounts, budgetCycles, transactions } from "../db/schema";
 import { autopayCalendar } from "./autopays";
 import { computeBalances } from "./balances";
+import { cardStatus } from "./cards";
 import { currentCycle } from "./cycles";
 import { spentBetween } from "./dashboard";
 import { getSetting } from "./settings";
@@ -53,7 +54,11 @@ export async function buildSalaryPlan(db: Db, today = istDate()): Promise<Salary
     const need = Math.max(0, needPaise);
     items.push({ key, label, fromAccountId: salary.id, toAccountId: toId, needPaise: need, sentPaise: sentTo(toId), done: need <= 100 });
   };
-  if (card) add("card_bill", "Pay the credit card bill", card.id, bal(card.id));
+  if (card) {
+    // Pay what the statement asks for (unbilled spends go on the next bill); without one, everything owed.
+    const s = await cardStatus(db, card, balances.get(card.id), today);
+    add("card_bill", "Pay the credit card bill", card.id, s.leftToPayPaise ?? bal(card.id));
+  }
   if (spending) add("spending", "Daily spending money", spending.id, cycle.budgetPaise - spentSoFar - nonSipDue - bal(spending.id));
   if (autopay) add("autopays", "Autopays due this cycle + buffer", autopay.id, dueFromAutopay + autopayBuffer - bal(autopay.id));
 

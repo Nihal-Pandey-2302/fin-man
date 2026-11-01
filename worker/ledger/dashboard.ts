@@ -4,6 +4,7 @@ import { addDays, daysBetween, istDate, istDayStart } from "../../shared/time";
 import type { Db } from "../db";
 import { accounts, autopays, categoryBudgets, smsRaw, transactions } from "../db/schema";
 import { buildAlerts, lastSmsAt } from "./alerts";
+import { cardStatuses } from "./cards";
 import { computeBalances } from "./balances";
 import { currentCycle } from "./cycles";
 import { getSetting } from "./settings";
@@ -92,7 +93,8 @@ export async function buildDashboard(db: Db, now = new Date()): Promise<Dashboar
   const dailyAllowancePaise = Math.max(0, Math.floor(remainingAtDayStart / daysLeft));
 
   const balances = await computeBalances(db, accountRows, today);
-  const alerts = await buildAlerts(db, today, { accountRows, balances, cycle, lastSms });
+  const cards = await cardStatuses(db, accountRows, balances, today);
+  const alerts = await buildAlerts(db, today, { accountRows, balances, cycle, lastSms, cards });
   const liquidPaise = accountRows
     .filter((a) => a.kind !== "credit_card")
     .reduce((s, a) => s + (balances.get(a.id)?.balancePaise ?? 0), 0);
@@ -124,6 +126,7 @@ export async function buildDashboard(db: Db, now = new Date()): Promise<Dashboar
     recent: recent.map(serializeTxn),
     reviewCount: review,
     lastSmsAt: lastSms?.toISOString() ?? null,
+    cards,
     salary: {
       // Around payday (25th–10th) with nothing marked as salary in the last 20 days: offer to record it.
       awaiting: (dayOfMonth(today) >= 25 || dayOfMonth(today) <= 10) && (!lastSalary || daysBetween(istDate(lastSalary.occurredAt), today) > 20),

@@ -45,6 +45,30 @@ export type AccountBalance = {
 };
 export type Account = Jsonify<typeof accounts.$inferSelect> & { numbers: AccountNumber[]; balance: AccountBalance };
 
+/** Where a credit card stands against its last statement (see worker/ledger/cards.ts). */
+export type CardStatus = {
+  accountId: number;
+  /** The last statement date on or before today; null until the statement day is set. */
+  statementDate: string | null;
+  dueDate: string | null;
+  /** What that statement asks for; null when it can't be known (enter it, or wait for the next statement). */
+  statementPaise: number | null;
+  /** "bank": entered by the owner (or read from the statement SMS); "computed": worked out from the ledger. */
+  statementSource: "bank" | "computed" | null;
+  minDuePaise: number | null;
+  /** Card payments received since the statement. */
+  paidPaise: number;
+  leftToPayPaise: number | null;
+  status: "paid" | "due" | "overdue" | "nothing_due" | "unknown";
+  daysToDue: number | null;
+  /** Spent on the card since the statement: it goes on the next bill. */
+  spentSincePaise: number;
+  outstandingPaise: number;
+  limitPaise: number | null;
+  /** Outstanding ÷ limit, 0–1+ (null without a limit). */
+  utilization: number | null;
+};
+
 export type Settings = {
   owner_names: string[];
   liquid_buffer_paise: number;
@@ -103,6 +127,8 @@ export type Alert = {
   title: string;
   body: string;
   href?: string;
+  /** Shown on Home but not pushed by the daily reminder (it would repeat every day). */
+  quiet?: boolean;
 };
 
 export type Report = {
@@ -146,6 +172,7 @@ export type Dashboard = {
   reviewCount: number;
   /** Newest SMS received from the phone (ISO), null before the first one. */
   lastSmsAt: string | null;
+  cards: CardStatus[];
   salary: {
     /** Payday is near and no salary has been recorded for it yet. */
     awaiting: boolean;
