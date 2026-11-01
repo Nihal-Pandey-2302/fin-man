@@ -1,6 +1,7 @@
 import { ArrowLeftRight, CreditCard } from "lucide-react";
 import { memo } from "react";
 import type { Txn } from "@shared/api";
+import { formatPaise } from "@shared/money";
 import { formatTime } from "@shared/time";
 import { CategoryBadge } from "@/components/category-picker";
 import { Money } from "@/components/money";
@@ -31,7 +32,14 @@ export const TxnRow = memo(function TxnRow({ txn, onOpen }: { txn: Txn; onOpen?:
           {txn.status === "needs_review" && <span className="size-1.5 shrink-0 rounded-full bg-amber-500" aria-label="needs review" />}
         </span>
         <span className="block truncate text-xs text-muted-foreground">
-          {[acc?.name, formatTime(new Date(txn.occurredAt)), cat && !paired && txn.merchant ? cat.name : null, txn.note]
+          {[
+            acc?.name,
+            formatTime(new Date(txn.occurredAt)),
+            cat && !paired && txn.merchant ? cat.name : null,
+            txn.sharePaise !== null ? `your share ${formatPaise(txn.sharePaise)}` : null,
+            txn.loanId ? "IOU payback" : null,
+            txn.note,
+          ]
             .filter(Boolean)
             .join(" · ")}
         </span>

@@ -11,7 +11,7 @@ type Row = typeof transactions.$inferSelect;
 
 /** SPEND (see dashboard.ts) for one row: expenses and fees count, refunds count back. */
 const spendOf = (t: Row) =>
-  t.direction === "debit" && (t.kind === "expense" || t.kind === "fee") ? t.amountPaise : t.direction === "credit" && t.kind === "refund" ? -t.amountPaise : 0;
+  t.direction === "debit" && (t.kind === "expense" || t.kind === "fee") ? (t.sharePaise ?? t.amountPaise) : t.direction === "credit" && t.kind === "refund" ? -t.amountPaise : 0;
 
 /**
  * Every transaction whose merchant has this rule key. The database narrows by the key's longest word, then

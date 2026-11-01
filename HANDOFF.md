@@ -101,7 +101,11 @@ Read this first if you're resuming after a context reset. Then read CLAUDE.md an
       - Routes: GET /api/merchants/:key and POST /:key/category.
       - Ways in: "All payments to X →" in the txn editor (it closes the sheet first) and the Report's top merchants.
       - Toasts moved to bottom-center with mobileOffset above the tab bar; at the top they covered page headers.
-   c. [ ] Split with friends (your share as spending, the rest becomes an IOU in loans).
+   c. [x] **Split with friends + paybacks** (`ledger/loans.ts`, migration 0007: `transactions.share_paise`, `loans.split_txn_id` with ON DELETE SET NULL added by hand).
+      - SPEND uses the share. PUT/DELETE /api/transactions/:id/split creates or removes `they_owe` IOUs, and removal is refused once anything is repaid.
+      - `matchRepayment` runs in settle after autopay. It links a credit (or a debit, for you_owe) when exactly one friend's name fits (`personMatches`: every typed word is in the bank's name) and the amount ≤ what's owed. The money becomes kind transfer + loanId, plus a loan_payments row.
+      - PUT/DELETE /:id/repayment link and unlink by hand. updateTxn and delete call `unlinkRepayment`, and an amount edit recomputes the share.
+      - UI: `FriendsSection` in the txn editor; TxnRow shows "your share" / "IOU payback".
    d. [ ] Trends and unusual-spend alerts (6-month category chart in Report; alert when a category runs well above its usual level). Needs 2–3 cycles of data.
 
 ## Waiting on the owner

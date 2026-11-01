@@ -6,6 +6,7 @@ import { merchantPath } from "@shared/merchant";
 import { formatPaise, rupeesToPaise } from "@shared/money";
 import { fromIstInput, toIstInput } from "@shared/time";
 import { CategoryPicker } from "@/components/category-picker";
+import { FriendsSection } from "@/components/friends-section";
 import { NativeSelect } from "@/components/native-select";
 import { ResponsiveSheet } from "@/components/responsive-sheet";
 import {
@@ -220,6 +221,8 @@ function EditorForm({ target, onDone }: { target: EditorTarget; onDone: () => vo
         <Label htmlFor="note">Note</Label>
         <Textarea id="note" value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="Optional" />
       </div>
+
+      {target.mode === "edit" && <FriendsSection txn={target.txn} onDone={onDone} />}
 
       <div className="sticky bottom-0 flex flex-wrap items-center gap-2 bg-popover pt-2">
         {target.mode === "edit" && (

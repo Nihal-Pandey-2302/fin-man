@@ -41,7 +41,7 @@ Both dev servers share the local D1 in `.wrangler/state`. Delete that folder to 
   - `db/`: Drizzle schema plus `getDb()`.
   - `sms/`: the ingest pipeline. `normalize` handles sender/body/hash, `classify` handles OTP/promo, `senders` is the allowlist, `parsers/*` holds one module per bank, and `ingest.ts` runs store → parse → resolve account → rules → settle.
   - `ledger/`: domain logic.
-    - `settle.ts` orders what happens to each new transaction: salary, then autopay match, then transfer pairing.
+    - `settle.ts` orders what happens to each new transaction: salary, then autopay match, then IOU payback (`loans.ts`), then transfer pairing.
     - `salary`, `autopays` (match/calendar/heads-ups), `matcher` (transfers, owner names), `rules`.
     - `balances`, `cycles`, `dashboard` (`SPEND` is the single definition of spending), `alerts`, `salary-plan`, `report`, `settings`.
   - `routes/`: thin Hono routers with zod validation. `push.ts` holds web push (VAPID).
@@ -49,7 +49,7 @@ Both dev servers share the local D1 in `.wrangler/state`. Delete that folder to 
 - `src/`: React SPA. `components/ui/` is shadcn-generated (edit freely, but regenerate with `npx shadcn add`). `components/layout/` holds the responsive shell. `pages/` has one file per route.
 - `migrations/`: generated SQL, committed, applied by wrangler.
 - `tests/`: Vitest. Parser fixtures go in `tests/fixtures/sms/<bank>/`, and `helpers.ts` has `api()`, `postSms()`, `seedAccounts()` and `resetLedger()`.
-- Every new transaction must go through `settleNewTransaction`. Every edit or delete must undo what that set up (`unpairGroup`, `unmatchAutopay`, `unlinkSalary`); see `updateTxn`.
+- Every new transaction must go through `settleNewTransaction`. Every edit or delete must undo what that set up (`unpairGroup`, `unmatchAutopay`, `unlinkSalary`, `unlinkRepayment`); see `updateTxn`.
 - Workers free plan: ~10 ms CPU per request. Keep request handlers I/O-bound and batch heavy work (the SMS import sends batches of 20).
 - shadcn's `cn` comes from the `cn` npm package (the new shadcn default), not a local clsx/tailwind-merge helper.
 - Versions: Vite 8, React 19, react-router 8, Tailwind 4, TypeScript 6.0 (pinned to match Cloudflare's template, not TS 7), Vitest 5.
@@ -75,6 +75,8 @@ Both dev servers share the local D1 in `.wrangler/state`. Delete that folder to 
 - **Card spend:** `kind=expense` on the card account. Card outstanding = spends − payments.
 - **Pairing:** the matcher auto-pairs transfers and card payments by equal amount within ±2 days (IST). Uncertain pairs go to the review inbox (`status=needs_review`) and are never force-paired.
 - **Spending and income totals exclude** `transfer` and `card_payment` by construction. Any aggregate query must filter on `kind`, not just `direction`.
+- **Split with friends:** `transactions.share_paise` is your share. `SPEND` counts `COALESCE(share_paise, amount_paise)`, and the balance still moves by the full amount. Friends' parts are `they_owe` loans with `split_txn_id`.
+- **IOU paybacks:** a friend's money back, or you repaying, is `kind=transfer` with `loan_id`, no `transfer_group_id`, and a `loan_payments` row. That makes it neither income nor spending.
 - **Account balances are derived** from transactions and the latest SMS `balance_after_paise`. They are never kept as a mutable counter updated read-modify-write, as the old app did.
 
 ## SMS parsers

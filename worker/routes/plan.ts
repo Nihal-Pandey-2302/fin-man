@@ -3,7 +3,6 @@ import { asc, desc, eq, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { z } from "zod";
 import { istDate, istToUtc, nextDayOfMonth, parseDate } from "../../shared/time";
-import type { Db } from "../db";
 import {
   AUTOPAY_KINDS,
   autopays,
@@ -21,6 +20,7 @@ import {
 } from "../db/schema";
 import { advanceAutopay, autopayCalendar } from "../ledger/autopays";
 import { currentCycle, startCycle } from "../ledger/cycles";
+import { refreshLoanStatus } from "../ledger/loans";
 import { serializeGoal } from "../ledger/savings";
 import { settleNewTransaction } from "../ledger/settle";
 import { findOpenLeg } from "../ledger/twins";
@@ -221,17 +221,6 @@ const loanSchema = z.object({
   dueOn: date.nullish(),
   note: text(500).nullish(),
 });
-
-async function refreshLoanStatus(db: Db, loanId: number) {
-  const loan = await db.select().from(loans).where(eq(loans.id, loanId)).get();
-  if (!loan) return;
-  const [{ paid }] = await db
-    .select({ paid: sql<number>`COALESCE(SUM(${loanPayments.amountPaise}), 0)` })
-    .from(loanPayments)
-    .where(eq(loanPayments.loanId, loanId));
-  const status = paid >= loan.principalPaise ? "settled" : paid > 0 ? "partially_paid" : "open";
-  if (status !== loan.status) await db.update(loans).set({ status }).where(eq(loans.id, loanId));
-}
 
 export const loanRoutes = new Hono<AppEnv>()
   .get("/", async (c) => {

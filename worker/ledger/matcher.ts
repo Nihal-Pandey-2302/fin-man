@@ -10,7 +10,7 @@ export type PairOutcome =
   | { paired: false; reason: "not_pairable" | "no_candidate" | "ambiguous" }
   | { paired: true; kind: "transfer" | "card_payment"; groupId: string; counterpartId: number; confident: boolean };
 
-const tokens = (s: string) => s.toUpperCase().replace(/[^A-Z\s]/g, " ").split(/\s+/).filter(Boolean);
+export const tokens = (s: string) => s.toUpperCase().replace(/[^A-Z\s]/g, " ").split(/\s+/).filter(Boolean);
 
 /**
  * Does a bank-printed name refer to the owner? Strict on purpose (a false match hides a real expense):

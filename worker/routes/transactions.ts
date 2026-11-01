@@ -8,6 +8,7 @@ import type { Db } from "../db";
 import { accounts, DIRECTIONS, INCOME_SOURCES, smsRaw, transactions, TXN_KINDS, TXN_STATUSES } from "../db/schema";
 import { unpairGroup } from "../ledger/matcher";
 import { unmatchAutopay } from "../ledger/autopays";
+import { linkRepayment, LoanError, splitOf, splitTxn, unlinkRepayment, unsplitTxn } from "../ledger/loans";
 import { detectSalary, unlinkSalary } from "../ledger/salary";
 import { adoptManualTwin, findOpenLeg } from "../ledger/twins";
 import { settleNewTransaction } from "../ledger/settle";
@@ -87,12 +88,17 @@ export async function updateTxn(db: Db, txnId: number, patch: Patch) {
   if (t.incomeSource === "salary" && ((fields.incomeSource !== undefined && fields.incomeSource !== "salary") || kindAfter !== "income" || breaksPair)) {
     await unlinkSalary(db, t);
   }
+  // A payback whose kind, amount, direction or account changes no longer pays the IOU it was linked to.
+  if (t.loanId && (breaksPair || kindAfter !== "transfer")) await unlinkRepayment(db, t);
+  // A split payment's new amount: your share is whatever the friends' IOUs don't cover.
+  const sharePaise = t.sharePaise !== null && fields.amountPaise !== undefined && fields.amountPaise !== t.amountPaise ? Math.max(0, fields.amountPaise - (t.amountPaise - t.sharePaise)) : undefined;
 
   const [row] = await db
     .update(transactions)
     .set({
       ...fields,
       ...(occurredAt && { occurredAt: new Date(occurredAt) }),
+      ...(sharePaise !== undefined && { sharePaise }),
       ...(kind !== "income" && { incomeSource: null }),
 
       status: fields.status ?? "confirmed",
@@ -214,6 +220,52 @@ export const transactionRoutes = new Hono<AppEnv>()
     });
     return result ? c.json(result) : c.json({ error: "not_found" }, 404);
   })
+  /** Split with friends: their parts become IOUs, your share stays spending. */
+  .get("/:id/split", idParam, async (c) => c.json(await splitOf(c.var.db, c.req.valid("param").id)))
+  .put(
+    "/:id/split",
+    idParam,
+    zValidator("json", z.object({ friends: z.array(z.object({ person: text(60).min(1), amountPaise: paise })).min(1).max(20) })),
+    async (c) => {
+      try {
+        const row = await splitTxn(c.var.db, c.req.valid("param").id, c.req.valid("json").friends);
+        return row ? c.json(row) : c.json({ error: "not_found" }, 404);
+      } catch (err) {
+        if (err instanceof LoanError) return c.json({ error: err.message }, 409);
+        throw err;
+      }
+    },
+  )
+  .delete("/:id/split", idParam, async (c) => {
+    const t = await c.var.db.select().from(transactions).where(eq(transactions.id, c.req.valid("param").id)).get();
+    if (!t) return c.json({ error: "not_found" }, 404);
+    try {
+      await unsplitTxn(c.var.db, t);
+    } catch (err) {
+      if (err instanceof LoanError) return c.json({ error: err.message }, 409);
+      throw err;
+    }
+    return c.json({ unsplit: true });
+  })
+  /** "It's Rahul paying me back": link this money to an IOU (neither income nor spending then). */
+  .put("/:id/repayment", idParam, zValidator("json", z.object({ loanId: id })), async (c) => {
+    try {
+      const row = await linkRepayment(c.var.db, c.req.valid("param").id, c.req.valid("json").loanId);
+      return row ? c.json(row) : c.json({ error: "not_found" }, 404);
+    } catch (err) {
+      if (err instanceof LoanError) return c.json({ error: err.message }, 409);
+      throw err;
+    }
+  })
+  .delete("/:id/repayment", idParam, async (c) => {
+    const db = c.var.db;
+    const t = await db.select().from(transactions).where(eq(transactions.id, c.req.valid("param").id)).get();
+    if (!t) return c.json({ error: "not_found" }, 404);
+    await unlinkRepayment(db, t);
+    // Back to plain money in / out, waiting for a category.
+    const [row] = await db.update(transactions).set({ kind: t.direction === "credit" ? "income" : "expense", status: "needs_review" }).where(eq(transactions.id, t.id)).returning();
+    return c.json(row);
+  })
   .delete("/:id", idParam, async (c) => {
     const db = c.var.db;
     const t = await db.select().from(transactions).where(eq(transactions.id, c.req.valid("param").id)).get();
@@ -221,6 +273,7 @@ export const transactionRoutes = new Hono<AppEnv>()
     if (t.transferGroupId) await unpairGroup(db, t.transferGroupId);
     await unmatchAutopay(db, t);
     await unlinkSalary(db, t);
+    await unlinkRepayment(db, t);
     await db.delete(transactions).where(eq(transactions.id, t.id));
     // Keep the SMS but make sure a reprocess can't resurrect the deleted transaction.
     if (t.smsId) await db.update(smsRaw).set({ parseStatus: "ignored", error: "deleted_by_user" }).where(eq(smsRaw.id, t.smsId));

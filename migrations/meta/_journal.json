@@ -50,6 +50,13 @@
       "when": 1793546674739,
       "tag": "0006_goals",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1793552135559,
+      "tag": "0007_splits",
+      "breakpoints": true
     }
   ]
 }

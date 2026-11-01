@@ -14,9 +14,10 @@ const dayOfMonth = (date: string) => Number(date.slice(8, 10));
 /**
  * Spending = expense + fee debits, minus refunds. Transfers, card payments, income and investments
  * (SIPs, stock purchases) never count, so moving money between your own accounts can't double count.
+ * A payment split with friends counts only your share (the rest is an IOU, repaid as a neutral transfer).
  */
 export const SPEND = sql`CASE
-  WHEN ${transactions.kind} IN ('expense', 'fee') AND ${transactions.direction} = 'debit' THEN ${transactions.amountPaise}
+  WHEN ${transactions.kind} IN ('expense', 'fee') AND ${transactions.direction} = 'debit' THEN COALESCE(${transactions.sharePaise}, ${transactions.amountPaise})
   WHEN ${transactions.kind} = 'refund' AND ${transactions.direction} = 'credit' THEN -${transactions.amountPaise}
   ELSE 0 END`;
 

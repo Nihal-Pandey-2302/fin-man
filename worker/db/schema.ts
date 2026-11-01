@@ -169,6 +169,8 @@ export const loans = sqliteTable(
     dueOn: text(),
     status: text({ enum: LOAN_STATUSES }).notNull().default("open"),
     note: text(),
+    /** The payment this IOU was split from ("paid ₹1,200 for 3"), if any. */
+    splitTxnId: integer().references((): AnySQLiteColumn => transactions.id, { onDelete: "set null" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -208,6 +210,11 @@ export const transactions = sqliteTable(
     loanId: integer().references(() => loans.id, { onDelete: "set null" }),
     /** Set when this debit was matched to a scheduled autopay (marks that occurrence paid). */
     autopayId: integer().references((): AnySQLiteColumn => autopays.id, { onDelete: "set null" }),
+    /**
+     * Split with friends: your own share of this payment (the rest is owed to you, see loans.splitTxnId).
+     * Spending counts this instead of the full amount; the balance still moves by the full amount.
+     */
+    sharePaise: integer(),
     note: text(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
