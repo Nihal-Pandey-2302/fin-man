@@ -27,6 +27,7 @@ const settingsSchema = z
     savings_account_id: z.number().int().positive().nullable(),
     notify_new_txns: z.boolean(),
     dismissed_recurring: z.array(z.string().max(120)).max(500),
+    weekly_digest: z.boolean(),
   })
   .partial();
 

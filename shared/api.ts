@@ -137,6 +137,7 @@ export type Settings = {
   savings_account_id: number | null;
   notify_new_txns: boolean;
   dismissed_recurring: string[];
+  weekly_digest: boolean;
 };
 
 export type Bootstrap = {

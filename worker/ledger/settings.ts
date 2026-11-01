@@ -21,6 +21,8 @@ export const SETTING_DEFAULTS = {
   notify_new_txns: true,
   /** Recurring-payment suggestions the owner said aren't recurring (merchant keys). */
   dismissed_recurring: [] as string[],
+  /** Sunday-evening summary push. */
+  weekly_digest: true,
 };
 export type Settings = typeof SETTING_DEFAULTS;
 export type SettingKey = keyof Settings;

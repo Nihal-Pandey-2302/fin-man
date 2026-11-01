@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { BACKUP_CRON, runBackup, type BackupEnv } from "./backup";
 import { runDaily } from "./daily";
+import { DIGEST_CRON, runDigest } from "./ledger/digest";
 import { getDb } from "./db";
 import { accountRoutes } from "./routes/accounts";
 import { cardRoutes } from "./routes/cards";
@@ -65,6 +66,10 @@ export default {
       const kv = (env as Env & BackupEnv).BACKUPS;
       if (kv) ctx.waitUntil(runBackup(env.DB, kv).then((r) => console.log("backup", r)));
       else console.warn("backup skipped: no BACKUPS KV binding");
+      return;
+    }
+    if (controller.cron === DIGEST_CRON) {
+      ctx.waitUntil(runDigest(db, env).then((r) => console.log("digest", r)));
       return;
     }
     ctx.waitUntil(runDaily(db, env).then((r) => console.log("daily", r)));

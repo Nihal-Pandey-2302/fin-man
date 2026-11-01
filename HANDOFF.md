@@ -94,7 +94,11 @@ Read this first if you're resuming after a context reset. Then read CLAUDE.md an
    - KV namespace BACKUPS created and bound 2026-11-01 (id in wrangler.jsonc). POST /api/backups/run backs up on demand (Settings → Back up now). Everything up to #5 is deployed.
    - Watch the free-plan 10 ms CPU limit on cron as sms_raw grows (JSON.stringify of the whole DB).
    - Restore: `npm run restore -- <file> [--remote]` (scripts/restore.mjs) → safety backup, `restoreStatements()` from shared/backup-sql.ts, row-count check. Backups are format v2 (raw SQL rows); v1 files (camelCase from the old /api/export) are refused. A round-trip test covers multi-line SMS and quotes.
-6. Later: 6-month trends and unusual-spend alerts, merchant pages, splitting with friends (→ loans), weekly digest push.
+6. Later items, in the order the owner agreed:
+   a. [x] **Weekly digest**: `ledger/digest.ts` `buildDigest`/`digestNote` on cron `0 14 * * 0` (Sun 19:30 IST). It covers the week's SPEND against the week before, the top category, the cycle left and per-day amount (from buildDashboard), the next 7 days' card bill and autopays, and the review count. Setting `weekly_digest`, with a toggle in Settings → Notifications.
+   b. [ ] Merchant pages (all payments, monthly totals, average, rule editing).
+   c. [ ] Split with friends (your share as spending, the rest becomes an IOU in loans).
+   d. [ ] Trends and unusual-spend alerts (6-month category chart in Report; alert when a category runs well above its usual level). Needs 2–3 cycles of data.
 
 ## Waiting on the owner
 1. ~~SMS sender IDs~~ received 2026-11-01: IDFCFB (AX-/AD-/CP-), INDBNK (BV-/VM-, -S/-T), HDFCBK (JK-). They're the allowlist in worker/sms/senders.ts. A bank-looking SMS from any other sender is stored as `unknown_sender:<ID>` and waits in Review; it's never auto-parsed and is skipped by bulk reprocess. IDFC also sends a monthly "interest credited" SMS (from AD-IDFCFB-S); there's no sample yet, so it lands in Review.

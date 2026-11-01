@@ -168,21 +168,20 @@ const b64ToBytes = (b64url: string) => {
   return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 };
 
-/** Per-transaction pushes with category buttons (file a payment straight from the notification). */
-function NewTxnToggle() {
+/** An on/off push setting, saved straight away. */
+function PushToggle({ setting, title, description }: { setting: "notify_new_txns" | "weekly_digest"; title: string; description: string }) {
   const { settings } = useLookups();
   const qc = useQueryClient();
-  const on = settings?.notify_new_txns ?? true;
   return (
     <label className="flex items-start justify-between gap-3 border-t pt-3 text-sm">
       <span>
-        <span className="block font-medium">New transactions</span>
-        <span className="block text-xs text-muted-foreground">A notification for each payment that needs a category, with buttons to file it.</span>
+        <span className="block font-medium">{title}</span>
+        <span className="block text-xs text-muted-foreground">{description}</span>
       </span>
       <Switch
-        checked={on}
+        checked={settings?.[setting] ?? true}
         onCheckedChange={async (checked) => {
-          await patch("/settings", { notify_new_txns: checked });
+          await patch("/settings", { [setting]: checked });
           void qc.invalidateQueries({ queryKey: keys.bootstrap });
         }}
       />
@@ -255,7 +254,12 @@ function NotificationsCard() {
           </Button>
         )}
         </div>
-        {sub && <NewTxnToggle />}
+        {sub && (
+          <>
+            <PushToggle setting="notify_new_txns" title="New transactions" description="A notification for each payment that needs a category, with buttons to file it." />
+            <PushToggle setting="weekly_digest" title="Weekly digest" description="Sunday 7:30 pm: the week's spending, what's left this cycle, and what's due next week." />
+          </>
+        )}
       </CardContent>
     </Card>
   );
