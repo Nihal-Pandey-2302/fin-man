@@ -14,6 +14,8 @@ import { haptic } from "@/lib/haptic";
 import { paiseToInput } from "@/lib/format";
 import { useLedgerMutation, useLookups } from "@/lib/queries";
 
+/** Share of the limit a statement should report for the best credit score (mirrors worker/ledger/alerts.ts). */
+const REPORT_TARGET = 0.1;
 const utilTone = (u: number) => (u < 0.3 ? "bg-emerald-500" : u < 0.5 ? "bg-amber-500" : "bg-destructive");
 const inDays = (n: number) => (n === 0 ? "today" : n === 1 ? "tomorrow" : n < 0 ? `${-n} ${n === -1 ? "day" : "days"} late` : `${n} days left`);
 
@@ -62,6 +64,13 @@ export function CardBill({ status: s }: { status: CardStatus }) {
           <p className="text-xs text-muted-foreground">
             {formatPaise(s.spentSincePaise)} spent since {formatShortDate(s.statementDate)}
             {nextStatement && ` · goes on the ${formatShortDate(nextStatement)} bill`}
+          </p>
+        )}
+        {/* The statement balance is what the credit bureaus see: ~10% of the limit is best for the score. */}
+        {nextStatement && s.limitPaise && s.outstandingPaise > s.limitPaise * REPORT_TARGET && (
+          <p className="text-xs text-muted-foreground">
+            For your credit score: before {formatShortDate(nextStatement)}, pay it down to under {formatPaise(s.limitPaise * REPORT_TARGET)} (
+            {formatPaise(Math.ceil((s.outstandingPaise - s.limitPaise * REPORT_TARGET) / 10_000) * 10_000)} more than that now).
           </p>
         )}
       </CardContent>

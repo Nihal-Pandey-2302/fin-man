@@ -20,6 +20,9 @@ export async function lastSmsAt(db: Db): Promise<Date | null> {
   return row?.at ?? null;
 }
 
+/** Share of the card limit a statement should report for the best credit score (under 30% is fine, ~10% best). */
+export const REPORT_TARGET = 0.1;
+
 const inDays = (n: number) => (n === 0 ? "today" : n === 1 ? "tomorrow" : `in ${n} days`);
 
 /**
@@ -86,6 +89,19 @@ export async function buildAlerts(db: Db, today = istDate(), pre?: Precomputed):
       if (n <= 3) {
         alerts.push({ key: `card_due:${card.id}:${b.nextDueOn}`, level: n <= 1 ? "danger" : "warn", title: `${card.name} bill due ${inDays(n)}`, body: `${formatPaise(b.balancePaise)} outstanding · due ${formatShortDate(b.nextDueOn)}. Enter the statement amount to see exactly what's due.`, href: "/" });
       }
+    }
+    // Credit history: the statement balance is what's reported to the credit bureaus. A day or two before the
+    // statement, if it would report more than ~10% of the limit, say how much to pay first.
+    const toStatement = b?.nextStatementOn ? daysBetween(today, b.nextStatementOn) : null;
+    if (b && toStatement !== null && toStatement >= 1 && toStatement <= 2 && s.limitPaise && s.outstandingPaise > s.limitPaise * REPORT_TARGET) {
+      const payPaise = Math.ceil((s.outstandingPaise - s.limitPaise * REPORT_TARGET) / 10_000) * 10_000;
+      alerts.push({
+        key: `card_prestatement:${card.id}:${b.nextStatementOn}`,
+        level: "warn",
+        title: `Pay ${formatPaise(payPaise)} on ${card.name} before ${formatShortDate(b.nextStatementOn!)}`,
+        body: `The statement reports ${formatPaise(s.outstandingPaise)} (${Math.round((s.outstandingPaise / s.limitPaise) * 100)}% of the limit) to the credit bureaus. Paying this first keeps it near 10%, which is best for your credit score.`,
+        href: "/",
+      });
     }
     if (b?.nextStatementOn === today) {
       alerts.push({ key: `card_statement:${card.id}:${today}`, level: "info", title: `${card.name} statement today`, body: `${formatPaise(b.balancePaise)} outstanding`, href: "/" });

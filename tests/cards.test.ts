@@ -90,3 +90,18 @@ describe("card bill guard", () => {
     expect((await statusOn("2026-11-03")).status).toBe("unknown");
   });
 });
+
+describe("credit-history nudge before the statement", () => {
+  it("asks to pay down to ~10% of the limit on the two days before the statement", async () => {
+    const { card } = await seedAccounts();
+    await setCard(card.id, { creditLimitPaise: 5_000_000, statementDay: 20, dueDay: 4, openingBalancePaise: 2_000_000, openingBalanceAt: ist(2026, 11, 10) });
+    const nudge = async (today: string) => (await buildAlerts(db, today)).find((a) => a.key.startsWith("card_prestatement"));
+    expect(await nudge("2026-11-17")).toBeUndefined();
+    expect(await nudge("2026-11-18")).toMatchObject({ level: "warn", title: "Pay ₹15,000 on IDFC Credit Card before 20 Nov" });
+    expect((await nudge("2026-11-19"))?.body).toContain("40% of the limit");
+    expect(await nudge("2026-11-20")).toBeUndefined(); // statement day itself: too late
+    // Already low: nothing to say.
+    await setCard(card.id, { openingBalancePaise: 400_000 });
+    expect(await nudge("2026-11-18")).toBeUndefined();
+  });
+});

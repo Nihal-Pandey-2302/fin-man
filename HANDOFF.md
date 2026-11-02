@@ -106,6 +106,7 @@ Read this first if you're resuming after a context reset. Then read CLAUDE.md an
       - `matchRepayment` runs in settle after autopay. It links a credit (or a debit, for you_owe) when exactly one friend's name fits (`personMatches`: every typed word is in the bank's name) and the amount ≤ what's owed. The money becomes kind transfer + loanId, plus a loan_payments row.
       - PUT/DELETE /:id/repayment link and unlink by hand. updateTxn and delete call `unlinkRepayment`, and an amount edit recomputes the share.
       - UI: `FriendsSection` in the txn editor; TxnRow shows "your share" / "IOU payback".
+   - [x] **Credit-history nudge**: the owner uses the card only to build credit history. Alert `card_prestatement` fires 1–2 days before the statement when outstanding > 10% of the limit (REPORT_TARGET in alerts.ts) and gives the amount to pay first. It's pushed by the 9 am job. The card tile shows the same target all month.
    d. [ ] Trends and unusual-spend alerts (6-month category chart in Report; alert when a category runs well above its usual level). Needs 2–3 cycles of data.
 
 ## Waiting on the owner
