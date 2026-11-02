@@ -113,7 +113,7 @@ describe("autopays", () => {
     alerts = await buildAlerts(db);
     expect(alerts.find((a) => a.key.startsWith("untracked_autopay"))?.title).toContain("Zenith Auto Rentals");
 
-    await api("/autopays", { method: "POST", json: { name: "Zenith Auto", kind: "emi", accountId: indian.id, amountPaise: 612_000, dayOfMonth: 1, nextDueOn: addDays(future, -2) } });
+    await api("/autopays", { method: "POST", json: { name: "Zenith Auto", kind: "emi", accountId: indian.id, amountPaise: 612_000, dayOfMonth: Number(addDays(future, -2).slice(8)), nextDueOn: addDays(future, -2) } });
     await postSms("VM-INDBNK", notice.replace("Pause", "Kindly pause")); // a second heads-up (new hash)
     const [ap] = await db.select().from(schema.autopays).all();
     expect(ap.nextDueOn).toBe(future);
@@ -154,7 +154,7 @@ describe("salary-day plan", () => {
     await api(`/accounts/${idfc.id}/balance`, { method: "POST", json: { balancePaise: 500_000 } });
     await api(`/accounts/${indian.id}/balance`, { method: "POST", json: { balancePaise: 200_000 } });
     await api(`/accounts/${card.id}/balance`, { method: "POST", json: { balancePaise: 1_200_000 } });
-    await api("/autopays", { method: "POST", json: { name: "EMI", kind: "emi", accountId: indian.id, amountPaise: 600_000, dayOfMonth: 1, nextDueOn: addDays(today, 5) } });
+    await api("/autopays", { method: "POST", json: { name: "EMI", kind: "emi", accountId: indian.id, amountPaise: 600_000, dayOfMonth: Number(addDays(today, 5).slice(8)), nextDueOn: addDays(today, 5) } });
     await setSetting(db, "autopay_buffer_paise", 100_000);
 
     let plan: SalaryPlan = await buildSalaryPlan(db, today);

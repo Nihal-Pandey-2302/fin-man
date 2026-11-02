@@ -27,7 +27,7 @@ describe("phase 2 regressions", () => {
 
   it("no 'short' alert for a credit card carrying an autopay", async () => {
     const { card } = await seedAccounts();
-    await api("/autopays", { method: "POST", json: { name: "Spotify", kind: "subscription", accountId: card.id, amountPaise: 11_900, dayOfMonth: 1, nextDueOn: addDays(istDate(), 2) } });
+    await api("/autopays", { method: "POST", json: { name: "Spotify", kind: "subscription", accountId: card.id, amountPaise: 11_900, dayOfMonth: Number(addDays(istDate(), 2).slice(8)), nextDueOn: addDays(istDate(), 2) } });
     expect((await buildAlerts(db)).some((a) => a.key.startsWith("autopay_short"))).toBe(false);
   });
 

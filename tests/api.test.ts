@@ -158,11 +158,11 @@ describe("dashboard", () => {
     await api("/transfers", { method: "POST", json: { fromAccountId: idfc.id, toAccountId: indian.id, amountPaise: 1_000_000 } }); // not spending
     await api("/autopays", {
       method: "POST",
-      json: { name: "Rent", kind: "bill", accountId: indian.id, amountPaise: 400_000, dayOfMonth: 1, nextDueOn: addDays(today, 3) },
+      json: { name: "Rent", kind: "bill", accountId: indian.id, amountPaise: 400_000, dayOfMonth: Number(addDays(today, 3).slice(8)), nextDueOn: addDays(today, 3) },
     });
     await api("/autopays", {
       method: "POST",
-      json: { name: "SIP", kind: "sip", accountId: indian.id, amountPaise: 300_000, dayOfMonth: 1, nextDueOn: addDays(today, 2) },
+      json: { name: "SIP", kind: "sip", accountId: indian.id, amountPaise: 300_000, dayOfMonth: Number(addDays(today, 2).slice(8)), nextDueOn: addDays(today, 2) },
     });
 
     const d = await json<Dashboard>(api("/dashboard"));
