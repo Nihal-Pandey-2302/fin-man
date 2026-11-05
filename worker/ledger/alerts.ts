@@ -68,6 +68,21 @@ export async function buildAlerts(db: Db, today = istDate(), pre?: Precomputed):
     }
   }
 
+  // A bank balance worked out from transactions (no SMS balance to anchor on) can't really be negative:
+  // an SMS is missing or a transaction was deleted. Say so before the numbers mislead.
+  for (const acc of accountRows.filter((a) => a.kind !== "credit_card")) {
+    const b = balances.get(acc.id);
+    if (b && b.basis === "manual" && b.balancePaise < 0) {
+      alerts.push({
+        key: `balance_negative:${acc.id}:${today}`,
+        level: "warn",
+        title: `${acc.name} shows ${formatPaise(b.balancePaise)}`,
+        body: "A bank balance can't be negative here, so an SMS is probably missing (or a transaction was deleted). Correct the balance in Accounts.",
+        href: "/more/accounts",
+      });
+    }
+  }
+
   // Cards: pay the statement in full by the due date (interest otherwise), and keep utilization low.
   const cards = pre?.cards ?? (await cardStatuses(db, accountRows, balances, today));
   for (const s of cards) {

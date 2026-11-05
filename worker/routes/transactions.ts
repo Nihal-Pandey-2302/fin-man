@@ -8,8 +8,8 @@ import type { Db } from "../db";
 import { accounts, DIRECTIONS, INCOME_SOURCES, smsRaw, transactions, TXN_KINDS, TXN_STATUSES } from "../db/schema";
 import { unpairGroup } from "../ledger/matcher";
 import { unmatchAutopay } from "../ledger/autopays";
-import { linkRepayment, LoanError, splitOf, splitTxn, unlinkRepayment, unsplitTxn } from "../ledger/loans";
-import { detectSalary, unlinkSalary } from "../ledger/salary";
+import { linkRepayment, LoanError, recordLoan, splitOf, splitTxn, unlinkRepayment, unrecordLoan, unsplitTxn } from "../ledger/loans";
+import { detectSalary, salaryCategoryId, unlinkSalary } from "../ledger/salary";
 import { adoptManualTwin, findOpenLeg } from "../ledger/twins";
 import { settleNewTransaction } from "../ledger/settle";
 import { applyRuleToUncategorized, learnRule } from "../ledger/rules";
@@ -85,8 +85,12 @@ export async function updateTxn(db: Db, txnId: number, patch: Patch) {
   // Same for links that depended on the old facts: autopay matches and salary detection.
   const kindAfter = fields.kind ?? t.kind;
   if (t.autopayId && (breaksPair || (kindAfter !== "expense" && kindAfter !== "investment"))) await unmatchAutopay(db, t);
-  if (t.incomeSource === "salary" && ((fields.incomeSource !== undefined && fields.incomeSource !== "salary") || kindAfter !== "income" || breaksPair)) {
+  // Moved out of the Salary category (or un-marked) means it isn't salary any more.
+  const salaryCat = await salaryCategoryId(db);
+  const leftSalaryCategory = fields.categoryId !== undefined && fields.categoryId !== salaryCat && fields.incomeSource !== "salary";
+  if (t.incomeSource === "salary" && ((fields.incomeSource !== undefined && fields.incomeSource !== "salary") || kindAfter !== "income" || breaksPair || leftSalaryCategory)) {
     await unlinkSalary(db, t);
+    if (leftSalaryCategory && fields.incomeSource === undefined) fields.incomeSource = null;
   }
   // A payback whose kind, amount, direction or account changes no longer pays the IOU it was linked to.
   if (t.loanId && (breaksPair || kindAfter !== "transfer")) await unlinkRepayment(db, t);
@@ -117,8 +121,10 @@ export async function updateTxn(db: Db, txnId: number, patch: Patch) {
       appliedTo = await applyRuleToUncategorized(db, rule, { onlyNeedsReview: true, excludeId: txnId });
     }
   }
-  // Marking a credit as salary starts the new budget cycle.
-  if (fields.incomeSource === "salary" && t.incomeSource !== "salary") await detectSalary(db, txnId);
+  // Marking a credit as salary (or filing it under Salary) starts the new budget cycle.
+  if ((fields.incomeSource === "salary" && t.incomeSource !== "salary") || (fields.categoryId !== undefined && fields.categoryId === salaryCat && t.incomeSource !== "salary")) {
+    await detectSalary(db, txnId);
+  }
   return { txn: row, ruleId, appliedTo };
 }
 
@@ -246,6 +252,26 @@ export const transactionRoutes = new Hono<AppEnv>()
       throw err;
     }
     return c.json({ unsplit: true });
+  })
+  /** "Borrowed from Arjun" / "Lent to Priya": this money is a loan, an IOU for its full amount. */
+  .put("/:id/loan", idParam, zValidator("json", z.object({ person: text(60).min(1) })), async (c) => {
+    try {
+      const out = await recordLoan(c.var.db, c.req.valid("param").id, c.req.valid("json").person);
+      return out ? c.json(out) : c.json({ error: "not_found" }, 404);
+    } catch (err) {
+      if (err instanceof LoanError) return c.json({ error: err.message }, 409);
+      throw err;
+    }
+  })
+  .delete("/:id/loan", idParam, async (c) => {
+    const t = await c.var.db.select().from(transactions).where(eq(transactions.id, c.req.valid("param").id)).get();
+    if (!t) return c.json({ error: "not_found" }, 404);
+    try {
+      return c.json(await unrecordLoan(c.var.db, t));
+    } catch (err) {
+      if (err instanceof LoanError) return c.json({ error: err.message }, 409);
+      throw err;
+    }
   })
   /** "It's Rahul paying me back": link this money to an IOU (neither income nor spending then). */
   .put("/:id/repayment", idParam, zValidator("json", z.object({ loanId: id })), async (c) => {

@@ -57,6 +57,13 @@
       "when": 1793552135559,
       "tag": "0007_splits",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1793907943064,
+      "tag": "0008_loan_txn",
+      "breakpoints": true
     }
   ]
 }

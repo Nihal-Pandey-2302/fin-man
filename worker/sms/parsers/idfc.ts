@@ -15,6 +15,13 @@ const UPI_DEBIT = new RegExp(
   "is",
 );
 
+// "Your A/C XXXXX123456 is debited by INR 2,345.67 on 04/11/26 19:06. New Bal :INR 1,111.11. Call us on
+//  180010888 for dispute. Team IDFC FIRST Bank" (no payee: e.g. a card bill paid from the IDFC app)
+const DEBIT = new RegExp(
+  String.raw`Your A/C ${ACCT} is debited by ${CUR}${AMT} on (\d{2}/\d{2}/\d{2,4})(?: (\d{1,2}:\d{2}))?\.\s*New Bal\s*:\s*${CUR}${AMT}.*IDFC FIRST`,
+  "is",
+);
+
 const base = { type: "txn", institution: "IDFC", accountKind: "bank", vpa: null, availableLimitPaise: null } as const;
 
 export const idfcParser: SmsParser = {
@@ -27,6 +34,21 @@ export const idfcParser: SmsParser = {
         ...base,
         last4: last4(acct),
         direction: "credit",
+        amountPaise: amount(amt),
+        channel: null,
+        counterparty: null,
+        refNo: null,
+        balanceAfterPaise: amount(bal),
+        occurredAt: occurredAt(dmy(date), time, receivedAt),
+      };
+    }
+    m = DEBIT.exec(body);
+    if (m) {
+      const [, acct, amt, date, time, bal] = m;
+      return {
+        ...base,
+        last4: last4(acct),
+        direction: "debit",
         amountPaise: amount(amt),
         channel: null,
         counterparty: null,

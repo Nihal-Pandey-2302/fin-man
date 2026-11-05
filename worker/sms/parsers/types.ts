@@ -19,6 +19,8 @@ export type ParsedTxn = {
   balanceAfterPaise: number | null;
   availableLimitPaise: number | null;
   occurredAt: Date;
+  /** Set when the SMS itself says what it is (a card's "payment received" is a bill payment, not a refund). */
+  kind?: "card_payment";
 };
 
 /** Informational SMS worth keeping structured (not a transaction). */

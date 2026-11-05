@@ -20,6 +20,22 @@ const RECEIVED = istToUtc(2026, 10, 31, 21, 0);
 const noonIst = (y: number, m: number, d: number) => istToUtc(y, m, d, 12, 0);
 
 const expected: Record<string, ReturnType<typeof parseSms>> = {
+  "card/payment_received.txt": {
+    parser: "idfc_card",
+    result: {
+      type: "txn", institution: "IDFC", accountKind: "credit_card", last4: "2222", direction: "credit",
+      amountPaise: 123_400, channel: null, counterparty: null, vpa: null, refNo: null,
+      balanceAfterPaise: null, availableLimitPaise: null, occurredAt: noonIst(2026, 11, 3), kind: "card_payment",
+    },
+  },
+  "idfc/debit_new_bal.txt": {
+    parser: "idfc",
+    result: {
+      type: "txn", institution: "IDFC", accountKind: "bank", last4: "3456", direction: "debit",
+      amountPaise: 234_567, channel: null, counterparty: null, vpa: null, refNo: null,
+      balanceAfterPaise: 111_111, availableLimitPaise: null, occurredAt: istToUtc(2026, 11, 4, 19, 6),
+    },
+  },
   "card/spend_rupay_swiggy.txt": {
     parser: "idfc_card",
     result: {

@@ -9,9 +9,16 @@ export function normalizeSender(raw: string): string {
   return m ? m[1] : s;
 }
 
-/** CRLF → LF, trim trailing spaces on each line and the whole body. */
+/**
+ * A mis-set forwarding app can paste its own "Bearer <token>" header after the SMS text (it happened once).
+ * It's never part of a bank message: drop it so the secret isn't stored and the hash stays the bank's text.
+ */
+const FORWARDING_TOKEN = /(?:\s*Bearer\s+[A-Za-z0-9_-]{16,})+\s*$/;
+
+/** CRLF → LF, trim trailing spaces on each line and the whole body, drop a pasted forwarding token. */
 export function normalizeBody(raw: string): string {
   return raw
+    .replace(FORWARDING_TOKEN, "")
     .replace(/\r\n?/g, "\n")
     .split("\n")
     .map((line) => line.trimEnd())

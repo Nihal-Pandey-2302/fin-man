@@ -171,6 +171,8 @@ export const loans = sqliteTable(
     note: text(),
     /** The payment this IOU was split from ("paid ₹1,200 for 3"), if any. */
     splitTxnId: integer().references((): AnySQLiteColumn => transactions.id, { onDelete: "set null" }),
+    /** The money that was the loan itself (a friend's transfer to you, or yours to them), if any. */
+    txnId: integer().references((): AnySQLiteColumn => transactions.id, { onDelete: "set null" }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

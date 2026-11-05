@@ -132,7 +132,7 @@ export async function processSms(db: Db, row: SmsRow): Promise<IngestOutcome> {
       occurredAt: result.occurredAt,
       amountPaise: result.amountPaise,
       direction: result.direction,
-      kind: rule?.kindOverride ?? defaultKind,
+      kind: rule?.kindOverride ?? result.kind ?? defaultKind,
       categoryId: rule?.categoryId ?? null,
       merchant: result.counterparty,
       counterpartyVpa: result.vpa,

@@ -107,6 +107,16 @@ Read this first if you're resuming after a context reset. Then read CLAUDE.md an
       - PUT/DELETE /:id/repayment link and unlink by hand. updateTxn and delete call `unlinkRepayment`, and an amount edit recomputes the share.
       - UI: `FriendsSection` in the txn editor; TxnRow shows "your share" / "IOU payback".
    - [x] **Credit-history nudge**: the owner uses the card only to build credit history. Alert `card_prestatement` fires 1–2 days before the statement when outstanding > 10% of the limit (REPORT_TARGET in alerts.ts) and gives the amount to pay first. It's pushed by the 9 am job. The card tile shows the same target all month.
+   - [x] **Cycle maths and real-life robustness** (2026-11-06, after the first live week):
+      - `ledger/budget.ts` `cycleMoney` is the single source for spent, fixed due, autopays due, remaining, daily allowance and the day-to-day series. Home, the salary plan and the digest all use it.
+      - Fixed costs (setting `fixed_costs`, matched by category from any account) and autopays (overdue included) are set aside. Paying them never moves the daily number.
+      - Borrowed/Lent (`recordLoan`, `loans.txn_id`, migration 0008); `unwindLoan` ("Not a loan").
+      - Auto short-loan detection: a credit from a person, then ≤5% different back to them within 7 days, both ≥₹500. Only credit-first, because debit-first looks like a shop refund.
+      - A credit filed under the Salary category becomes salary.
+      - Card "Thank you for payment" + IDFC "debited by … New Bal" parsers; card-payment legs pair even when filed.
+      - Mark paid searches any account first.
+      - `balance_negative` alert; a pasted "Bearer …" forwarding token is stripped in normalizeBody.
+      - Live data was repaired from a backup with a rehearsed SQL script (duplicate rent removed, deleted SMS restored as a transfer and a loan, card payments paired, salary marked).
    d. [ ] Trends and unusual-spend alerts (6-month category chart in Report; alert when a category runs well above its usual level). Needs 2–3 cycles of data.
 
 ## Waiting on the owner

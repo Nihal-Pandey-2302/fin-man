@@ -20,7 +20,7 @@ import {
 } from "../db/schema";
 import { advanceAutopay, autopayCalendar } from "../ledger/autopays";
 import { currentCycle, startCycle } from "../ledger/cycles";
-import { refreshLoanStatus } from "../ledger/loans";
+import { refreshLoanStatus, unwindLoan } from "../ledger/loans";
 import { serializeGoal } from "../ledger/savings";
 import { settleNewTransaction } from "../ledger/settle";
 import { findOpenLeg } from "../ledger/twins";
@@ -137,7 +137,10 @@ export const autopayRoutes = new Hono<AppEnv>()
     const amountPaise = parsed.data.amountPaise ?? a.amountPaise;
     const payment = { autopayId: a.id, categoryId: a.categoryId, kind: a.kind === "sip" ? ("investment" as const) : ("expense" as const), status: "confirmed" as const };
 
-    const existing = await findOpenLeg(db, { accountId: a.accountId, direction: "debit", amountPaise, at: occurredAt });
+    // The debit may already be here: from the autopay's account, or else from any account (paid by hand).
+    const existing =
+      (await findOpenLeg(db, { accountId: a.accountId, direction: "debit", amountPaise, at: occurredAt })) ??
+      (await findOpenLeg(db, { accountId: null, direction: "debit", amountPaise, at: occurredAt }));
     const [txn] = existing
       ? await db.update(transactions).set({ ...payment, categoryId: a.categoryId ?? existing.categoryId }).where(eq(transactions.id, existing.id)).returning()
       : await db.insert(transactions).values({ ...payment, accountId: a.accountId, amountPaise, direction: "debit", merchant: a.name, occurredAt, source: "manual" }).returning();
@@ -259,6 +262,11 @@ export const loanRoutes = new Hono<AppEnv>()
       return c.json(row, 201);
     },
   )
+  /** "Not a loan": undo the IOU, and its money goes back to plain income / spending for review. */
+  .post("/:id/unwind", idParam, async (c) => {
+    const out = await unwindLoan(c.var.db, c.req.valid("param").id);
+    return out ? c.json(out) : c.json({ error: "not_found" }, 404);
+  })
   .delete("/payments/:id", idParam, async (c) => {
     const [row] = await c.var.db.delete(loanPayments).where(eq(loanPayments.id, c.req.valid("param").id)).returning();
     if (row) await refreshLoanStatus(c.var.db, row.loanId);

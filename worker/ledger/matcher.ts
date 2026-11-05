@@ -45,13 +45,23 @@ const isPairable = (t: Txn) =>
   !(t.status === "confirmed" && t.categoryId !== null);
 
 /**
+ * A card bill payment's leg even when it was filed already: the card's own "payment received" credit, or a
+ * bank debit to a card payee (a learned rule may have given it a category). These pair only as a card payment.
+ */
+const isCardPaymentLeg = (t: Txn) =>
+  t.transferGroupId === null &&
+  t.autopayId === null &&
+  (t.kind === "card_payment" || (t.direction === "debit" && t.kind === "expense" && CARD_PAYEE.test(t.merchant ?? "")));
+const canPair = (t: Txn) => isPairable(t) || isCardPaymentLeg(t);
+
+/**
  * Pair a transaction with its other leg (own-account transfer, or bank → credit card bill payment):
  * opposite direction, different account, same amount, within ±2 days. Exactly one candidate is required;
  * the pair is confirmed only when neither side names a third party, otherwise it goes to the review inbox.
  */
 export async function pairTransaction(db: Db, txnId: number): Promise<PairOutcome> {
   const t = await db.select().from(transactions).where(eq(transactions.id, txnId)).get();
-  if (!t || !isPairable(t)) return { paired: false, reason: "not_pairable" };
+  if (!t || !canPair(t)) return { paired: false, reason: "not_pairable" };
 
   const at = t.occurredAt.getTime();
   const candidates = (
@@ -68,7 +78,7 @@ export async function pairTransaction(db: Db, txnId: number): Promise<PairOutcom
         ),
       )
       .all()
-  ).filter(isPairable);
+  ).filter(canPair);
 
   if (candidates.length === 0) return { paired: false, reason: "no_candidate" };
   if (candidates.length > 1) return { paired: false, reason: "ambiguous" };
@@ -88,6 +98,8 @@ export async function pairTransaction(db: Db, txnId: number): Promise<PairOutcom
   if (creditKind === "credit_card" && debitKind !== "credit_card") kind = "card_payment";
   else if (creditKind !== "credit_card" && debitKind !== "credit_card") kind = "transfer";
   else return { paired: false, reason: "not_pairable" };
+  // A leg that's only pairable as a card payment (see isCardPaymentLeg) never becomes an own-account transfer.
+  if (kind !== "card_payment" && !(isPairable(t) && isPairable(c))) return { paired: false, reason: "not_pairable" };
 
   const ownerNames = await getSetting(db, "owner_names");
   const neutral = (name: string | null) => name === null || isOwnerName(name, ownerNames);

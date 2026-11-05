@@ -23,6 +23,8 @@ export const SETTING_DEFAULTS = {
   dismissed_recurring: [] as string[],
   /** Sunday-evening summary push. */
   weekly_digest: true,
+  /** Monthly fixed costs (rent…), set aside from the budget and matched by category. */
+  fixed_costs: [] as { name: string; categoryId: number; amountPaise: number }[],
 };
 export type Settings = typeof SETTING_DEFAULTS;
 export type SettingKey = keyof Settings;

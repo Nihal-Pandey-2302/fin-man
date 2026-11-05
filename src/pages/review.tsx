@@ -1,10 +1,10 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeftRight, Check, MessageSquareWarning, Pencil, RotateCw, X } from "lucide-react";
+import { ArrowLeftRight, Check, MessageSquareWarning, Pencil, RotateCw, Users, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
-import { haptic } from "@/lib/haptic";
 import type { Review, Sms, Txn } from "@shared/api";
+import { formatPaise } from "@shared/money";
 import { formatDay, formatTime } from "@shared/time";
 import { CategoryBadge, CategoryPicker } from "@/components/category-picker";
 import { Money } from "@/components/money";
@@ -14,13 +14,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSwipe } from "@/hooks/use-swipe";
-import { post } from "@/lib/api";
+import { post, put } from "@/lib/api";
+import { haptic } from "@/lib/haptic";
 import { INSTITUTION_LABEL, txnTitle } from "@/lib/labels";
-import { invalidateLedger, keys, useLookups, useReview } from "@/lib/queries";
+import { invalidateLedger, keys, useLoans, useLookups, useReview } from "@/lib/queries";
 import { relativeTime } from "@/lib/relative";
 import { load } from "@/lib/storage";
 
-type Item = { kind: "txn"; txn: Txn } | { kind: "pair"; legs: Txn[] };
+type Item = { kind: "txn"; txn: Txn } | { kind: "pair"; legs: Txn[] } | { kind: "loan"; loanId: number; legs: Txn[] };
 
 export default function ReviewPage() {
   const { data, isPending } = useReview();
@@ -31,7 +32,15 @@ export default function ReviewPage() {
   const items = useMemo<Item[]>(() => {
     const out: Item[] = [];
     const seen = new Set<string>();
+    const seenLoans = new Set<number>();
     for (const t of data?.transactions ?? []) {
+      // A short loan found automatically: the money and its payback, decided together.
+      if (t.loanId && !t.transferGroupId) {
+        if (seenLoans.has(t.loanId)) continue;
+        seenLoans.add(t.loanId);
+        out.push({ kind: "loan", loanId: t.loanId, legs: data!.transactions.filter((x) => x.loanId === t.loanId) });
+        continue;
+      }
       if (t.transferGroupId) {
         if (seen.has(t.transferGroupId)) continue;
         seen.add(t.transferGroupId);
@@ -56,6 +65,26 @@ export default function ReviewPage() {
     }
   }
 
+  /** One tap: this money is a loan with the person the bank named. */
+  async function asLoan(t: Txn) {
+    haptic();
+    qc.setQueryData<Review>(keys.review, (r) => r && { ...r, transactions: r.transactions.filter((x) => x.id !== t.id) });
+    try {
+      await put(`/transactions/${t.id}/loan`, { person: t.merchant });
+      toast.success(t.direction === "credit" ? `Borrowed from ${t.merchant}: not income` : `Lent to ${t.merchant}: not spending`);
+    } catch {
+      toast.error("Couldn't record the loan. Try again.");
+    } finally {
+      invalidateLedger(qc);
+    }
+  }
+
+  async function notLoan(loanId: number) {
+    await post(`/loans/${loanId}/unwind`);
+    toast.info("Not a loan: back to money in / out");
+    invalidateLedger(qc);
+  }
+
   async function unpair(groupId: string) {
     await post(`/transfers/${groupId}/unpair`);
     invalidateLedger(qc);
@@ -77,7 +106,9 @@ export default function ReviewPage() {
       )}
 
       {items.map((item) =>
-        item.kind === "pair" ? (
+        item.kind === "loan" ? (
+          <LoanCard key={`loan-${item.loanId}`} legs={item.legs} onConfirm={() => confirm(item.legs.map((l) => l.id))} onNotLoan={() => notLoan(item.loanId)} />
+        ) : item.kind === "pair" ? (
           <PairCard key={item.legs[0].transferGroupId} legs={item.legs} onConfirm={() => confirm(item.legs.map((l) => l.id))} onUnpair={() => unpair(item.legs[0].transferGroupId!)} />
         ) : (
           <ReviewCard
@@ -86,6 +117,7 @@ export default function ReviewPage() {
             onConfirm={(categoryId) => (categoryId === undefined && !item.txn.categoryId && item.txn.kind === "expense" ? setPicking(item.txn) : confirm([item.txn.id], categoryId))}
             onEdit={() => setEditing({ mode: "edit", txn: item.txn })}
             onPick={() => setPicking(item.txn)}
+            onLoan={() => asLoan(item.txn)}
           />
         ),
       )}
@@ -105,7 +137,19 @@ function frequentCategoryIds(): number[] {
     .map(([id]) => Number(id));
 }
 
-function ReviewCard({ txn, onConfirm, onEdit, onPick }: { txn: Txn; onConfirm: (categoryId?: number) => void; onEdit: () => void; onPick: () => void }) {
+function ReviewCard({
+  txn,
+  onConfirm,
+  onEdit,
+  onPick,
+  onLoan,
+}: {
+  txn: Txn;
+  onConfirm: (categoryId?: number) => void;
+  onEdit: () => void;
+  onPick: () => void;
+  onLoan: () => void;
+}) {
   const { category, account, activeCategories } = useLookups();
   const swipe = useSwipe({ onRight: () => onConfirm(), onLeft: onEdit });
   const cat = category(txn.categoryId);
@@ -145,6 +189,12 @@ function ReviewCard({ txn, onConfirm, onEdit, onPick }: { txn: Txn; onConfirm: (
                 {c!.emoji} {c!.name}
               </Button>
             ))}
+            {/* Money from or to a person can be a loan: neither income nor spending. */}
+            {txn.merchant && (txn.kind === "income" || txn.kind === "expense") && (
+              <Button variant="secondary" size="sm" className="h-9 rounded-full pointer-coarse:h-10" onClick={onLoan}>
+                🤝 {credit ? "Borrowed" : "Lent"}
+              </Button>
+            )}
             <Button variant="ghost" size="sm" className="h-9 rounded-full pointer-coarse:h-10" onClick={onPick}>
               More…
             </Button>
@@ -160,6 +210,47 @@ function ReviewCard({ txn, onConfirm, onEdit, onPick }: { txn: Txn; onConfirm: (
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+/** "Short loan with Arjun?": money in from a person and back to them within days (or the other way round). */
+function LoanCard({ legs, onConfirm, onNotLoan }: { legs: Txn[]; onConfirm: () => void; onNotLoan: () => void }) {
+  const { account } = useLookups();
+  const { data: loans } = useLoans();
+  const loan = loans?.find((l) => l.id === legs[0].loanId);
+  const swipe = useSwipe({ onRight: onConfirm, onLeft: onNotLoan });
+  const sorted = [...legs].sort((a, b) => a.occurredAt.localeCompare(b.occurredAt));
+  const borrowed = loan ? loan.direction === "you_owe" : sorted[0].direction === "credit";
+  return (
+    <Card className="select-none" style={swipe.style} {...swipe.handlers}>
+      <CardContent className="space-y-3">
+        <div className="flex items-start gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted">
+            <Users className="size-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="font-medium">
+              {borrowed ? "Borrowed from" : "Lent to"} {loan?.person ?? sorted[0].merchant}, then paid back?
+            </p>
+            {sorted.map((t) => (
+              <p key={t.id} className="text-xs text-muted-foreground">
+                {t.direction === "credit" ? "+" : "−"}
+                {formatPaise(t.amountPaise)} · {account(t.accountId)?.name} · {formatDay(new Date(t.occurredAt))}
+              </p>
+            ))}
+            <p className="mt-1 text-xs text-muted-foreground">Kept out of income and spending.{loan && loan.principalPaise > loan.paidPaise ? ` ${formatPaise(loan.principalPaise - loan.paidPaise)} still open.` : ""}</p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={onNotLoan}>
+            <X /> Not a loan
+          </Button>
+          <Button size="sm" className="ml-auto" onClick={onConfirm}>
+            <Check /> Looks right
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

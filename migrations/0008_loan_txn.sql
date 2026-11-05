@@ -1,0 +1,1 @@
+ALTER TABLE `loans` ADD `txn_id` integer REFERENCES transactions(id) ON DELETE set null;

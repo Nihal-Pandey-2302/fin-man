@@ -189,17 +189,17 @@ function SafeToSpend({ d }: { d: Dashboard }) {
         <div>
           <div className="flex h-3 overflow-hidden rounded-full bg-muted" role="img" aria-label="Cycle budget used">
             <div className="bg-primary transition-all" style={{ width: pct(c.spentPaise) }} />
-            <div className="bg-amber-500/70 transition-all" style={{ width: pct(c.autopaysDuePaise) }} />
+            <div className="bg-amber-500/70 transition-all" style={{ width: pct(c.fixedDuePaise + c.autopaysDuePaise) }} />
           </div>
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
             <span>
               <span className="mr-1 inline-block size-2 rounded-full bg-primary" />
               Spent {formatPaise(c.spentPaise)}
             </span>
-            {c.autopaysDuePaise > 0 && (
+            {c.fixedDuePaise + c.autopaysDuePaise > 0 && (
               <span>
                 <span className="mr-1 inline-block size-2 rounded-full bg-amber-500/70" />
-                Autopays due {formatPaise(c.autopaysDuePaise)}
+                Rent & bills due {formatPaise(c.fixedDuePaise + c.autopaysDuePaise)}
               </span>
             )}
             <span className="ml-auto">

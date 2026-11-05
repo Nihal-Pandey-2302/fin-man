@@ -61,14 +61,15 @@ export async function adoptManualTwin(db: Db, t: TwinInput): Promise<number | nu
  * created a transaction. Find that transaction so it can be reused: same account, direction and amount,
  * within ±2 IST days, any source, and not already a transfer leg, an autopay payment or a salary.
  */
-export async function findOpenLeg(db: Db, leg: { accountId: number; direction: "debit" | "credit"; amountPaise: number; at: Date }) {
+export async function findOpenLeg(db: Db, leg: { accountId: number | null; direction: "debit" | "credit"; amountPaise: number; at: Date }) {
   const day = istDate(leg.at);
   const candidates = await db
     .select()
     .from(transactions)
     .where(
       and(
-        eq(transactions.accountId, leg.accountId),
+        // No account: any of them (a bill can be paid from whichever account had the money).
+        leg.accountId === null ? undefined : eq(transactions.accountId, leg.accountId),
         eq(transactions.direction, leg.direction),
         eq(transactions.amountPaise, leg.amountPaise),
         isNull(transactions.transferGroupId),

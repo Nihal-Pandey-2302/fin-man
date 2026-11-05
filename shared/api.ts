@@ -161,6 +161,7 @@ export type Settings = {
   notify_new_txns: boolean;
   dismissed_recurring: string[];
   weekly_digest: boolean;
+  fixed_costs: { name: string; categoryId: number; amountPaise: number }[];
 };
 
 export type Bootstrap = {
@@ -246,16 +247,23 @@ export type Dashboard = {
     daysLeft: number;
     budgetPaise: number;
     spentPaise: number;
+    /** Day-to-day spending today (fixed costs and autopay payments aside). */
     spentTodayPaise: number;
+    /** Fixed costs (rent…) not yet paid this cycle. */
+    fixedDuePaise: number;
+    /** Autopays not yet paid this cycle (overdue included, SIPs aside). */
     autopaysDuePaise: number;
     /** Even split of what's left across the remaining days (computed from the start of today). */
     dailyAllowancePaise: number;
     leftTodayPaise: number;
     remainingPaise: number;
   };
+  /** Fixed monthly costs and how much of each is paid this cycle. */
+  fixed: { name: string; categoryId: number; amountPaise: number; paidPaise: number }[];
   liquidPaise: number;
   bufferPaise: number;
   byCategory: CategorySpend[];
+  /** Day-to-day spending per day (fixed costs and autopay payments aside). */
   daily: { date: string; spentPaise: number }[];
   upcomingAutopays: (Autopay & { dueOn: string })[];
   recent: Txn[];

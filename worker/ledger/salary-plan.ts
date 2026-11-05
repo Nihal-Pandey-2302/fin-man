@@ -1,13 +1,13 @@
 import { and, eq, gte, inArray } from "drizzle-orm";
 import type { SalaryPlan } from "../../shared/api";
-import { addDays, istDate, istDayStart } from "../../shared/time";
+import { istDate, istDayStart } from "../../shared/time";
 import type { Db } from "../db";
 import { accounts, budgetCycles, goals, transactions } from "../db/schema";
 import { autopayCalendar } from "./autopays";
 import { computeBalances } from "./balances";
 import { cardStatus } from "./cards";
 import { currentCycle } from "./cycles";
-import { spentBetween } from "./dashboard";
+import { cycleMoney } from "./budget";
 import { goalMonthlyNeed } from "./savings";
 import { getSetting } from "./settings";
 
@@ -31,7 +31,6 @@ export async function buildSalaryPlan(db: Db, today = istDate()): Promise<Salary
   const occurrences = await autopayCalendar(db, cycle.startDate, cycle.endDate, today);
   const unpaid = occurrences.filter((o) => o.status !== "paid");
   const dueFromAutopay = unpaid.filter((o) => o.accountId === autopay?.id).reduce((s, o) => s + o.amountPaise, 0);
-  const nonSipDue = unpaid.filter((o) => o.kind !== "sip").reduce((s, o) => s + o.amountPaise, 0);
   const [autopayBuffer, savingsTarget, savingsAccountId, goalRows] = await Promise.all([
     getSetting(db, "autopay_buffer_paise"),
     getSetting(db, "savings_target_paise"),
@@ -52,7 +51,8 @@ export async function buildSalaryPlan(db: Db, today = istDate()): Promise<Salary
   const sentTo = (toId: number) =>
     legs.filter((l) => l.groupId !== null && l.accountId === toId && l.direction === "credit" && fromSalary.has(l.groupId)).reduce((s, l) => s + l.amountPaise, 0);
 
-  const spentSoFar = await spentBetween(db, istDayStart(cycle.startDate), istDayStart(addDays(today, 1)));
+  // What's left of the budget for day-to-day spending (fixed costs and autopays set aside, see budget.ts).
+  const money = await cycleMoney(db, cycle, today);
   const items: SalaryPlan["items"] = [];
   /** `needPaise`: what the destination still lacks right now. Done once that's (about) zero. */
   const add = (key: SalaryPlan["items"][number]["key"], label: string, toId: number | undefined, needPaise: number) => {
@@ -65,7 +65,7 @@ export async function buildSalaryPlan(db: Db, today = istDate()): Promise<Salary
     const s = await cardStatus(db, card, balances.get(card.id), today);
     add("card_bill", "Pay the credit card bill", card.id, s.leftToPayPaise ?? bal(card.id));
   }
-  if (spending) add("spending", "Daily spending money", spending.id, cycle.budgetPaise - spentSoFar - nonSipDue - bal(spending.id));
+  if (spending) add("spending", "Daily spending money", spending.id, money.remainingPaise - bal(spending.id));
   if (autopay) add("autopays", "Autopays due this cycle + buffer", autopay.id, dueFromAutopay + autopayBuffer - bal(autopay.id));
   // Pay yourself first: moved to the savings account if there is one, else kept in the salary account.
   const savingsAccount = accountRows.find((a) => a.id === savingsAccountId && a.id !== salary?.id);

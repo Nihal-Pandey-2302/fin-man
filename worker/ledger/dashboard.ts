@@ -1,9 +1,10 @@
-import { and, asc, desc, eq, gte, lt, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
 import type { Dashboard } from "../../shared/api";
 import { addDays, daysBetween, istDate, istDayStart } from "../../shared/time";
 import type { Db } from "../db";
 import { accounts, autopays, categoryBudgets, smsRaw, transactions } from "../db/schema";
 import { buildAlerts, lastSmsAt } from "./alerts";
+import { cycleMoney } from "./budget";
 import { cardStatuses } from "./cards";
 import { computeBalances } from "./balances";
 import { currentCycle } from "./cycles";
@@ -21,8 +22,6 @@ export const SPEND = sql`CASE
   WHEN ${transactions.kind} = 'refund' AND ${transactions.direction} = 'credit' THEN -${transactions.amountPaise}
   ELSE 0 END`;
 
-/** IST calendar day of an epoch-ms column, as YYYY-MM-DD. */
-const istDay = sql<string>`date((${transactions.occurredAt} + 19800000) / 1000, 'unixepoch')`;
 
 /** Spending (see SPEND) between two instants. */
 export async function spentBetween(db: Db, from: Date, to: Date): Promise<number> {
@@ -47,14 +46,8 @@ export async function buildDashboard(db: Db, now = new Date()): Promise<Dashboar
   const to = istDayStart(addDays(cycle.endDate, 1));
   const inCycle = and(gte(transactions.occurredAt, from), lt(transactions.occurredAt, to));
 
-  const [daily, byCategory, limits, dueAutopays, recent, accountRows, buffer, review, lastSms, lastSalary] = await Promise.all([
-    db
-      .select({ date: istDay, spentPaise: sql<number>`SUM(${SPEND})` })
-      .from(transactions)
-      .where(inCycle)
-      .groupBy(istDay)
-      .orderBy(asc(istDay))
-      .all(),
+  const [money, byCategory, limits, autopayRows, recent, accountRows, buffer, review, lastSms, lastSalary] = await Promise.all([
+    cycleMoney(db, cycle, today),
     db
       .select({ categoryId: transactions.categoryId, spentPaise: sql<number>`SUM(${SPEND})` })
       .from(transactions)
@@ -64,12 +57,7 @@ export async function buildDashboard(db: Db, now = new Date()): Promise<Dashboar
       .orderBy(desc(sql`SUM(${SPEND})`))
       .all(),
     cycle.id ? db.select().from(categoryBudgets).where(eq(categoryBudgets.cycleId, cycle.id)).all() : [],
-    db
-      .select()
-      .from(autopays)
-      .where(and(eq(autopays.active, true), gte(autopays.nextDueOn, today), lte(autopays.nextDueOn, cycle.endDate)))
-      .orderBy(asc(autopays.nextDueOn))
-      .all(),
+    db.select().from(autopays).where(eq(autopays.active, true)).all(),
     db.select().from(transactions).orderBy(desc(transactions.occurredAt), desc(transactions.id)).limit(6).all(),
     db.select().from(accounts).where(eq(accounts.archived, false)).all(),
     getSetting(db, "liquid_buffer_paise"),
@@ -84,14 +72,11 @@ export async function buildDashboard(db: Db, now = new Date()): Promise<Dashboar
       .get(),
   ]);
 
-  const spentPaise = daily.reduce((s, d) => s + d.spentPaise, 0);
-  const spentTodayPaise = daily.find((d) => d.date === today)?.spentPaise ?? 0;
-  // SIPs are investments, not spending: they're excluded here exactly as they are from `spent`.
-  const autopaysDuePaise = dueAutopays.filter((a) => a.kind !== "sip").reduce((s, a) => s + a.amountPaise, 0);
-  const daysLeft = Math.max(1, daysBetween(today, cycle.endDate) + 1);
-  const remainingPaise = cycle.budgetPaise - spentPaise - autopaysDuePaise;
-  const remainingAtDayStart = remainingPaise + spentTodayPaise;
-  const dailyAllowancePaise = Math.max(0, Math.floor(remainingAtDayStart / daysLeft));
+  // Autopays still to be paid this cycle (overdue ones too), soonest first, for the Home list.
+  const upcoming = money.upcomingAutopays
+    .map((o) => ({ o, a: autopayRows.find((a) => a.id === o.autopayId) }))
+    .filter((x): x is { o: (typeof money.upcomingAutopays)[number]; a: (typeof autopayRows)[number] } => !!x.a)
+    .sort((x, y) => x.o.dueOn.localeCompare(y.o.dueOn));
 
   const balances = await computeBalances(db, accountRows, today);
   const cards = await cardStatuses(db, accountRows, balances, today);
@@ -110,20 +95,22 @@ export async function buildDashboard(db: Db, now = new Date()): Promise<Dashboar
       id: cycle.id,
       startDate: cycle.startDate,
       endDate: cycle.endDate,
-      daysLeft,
+      daysLeft: money.daysLeft,
       budgetPaise: cycle.budgetPaise,
-      spentPaise,
-      spentTodayPaise,
-      autopaysDuePaise,
-      dailyAllowancePaise,
-      leftTodayPaise: dailyAllowancePaise - spentTodayPaise,
-      remainingPaise,
+      spentPaise: money.spentPaise,
+      spentTodayPaise: money.spentTodayPaise,
+      fixedDuePaise: money.fixedDuePaise,
+      autopaysDuePaise: money.autopaysDuePaise,
+      dailyAllowancePaise: money.dailyAllowancePaise,
+      leftTodayPaise: money.leftTodayPaise,
+      remainingPaise: money.remainingPaise,
     },
+    fixed: money.fixed,
     liquidPaise,
     bufferPaise: buffer,
     byCategory: [...byCategory, ...budgetOnly].map((c) => ({ ...c, limitPaise: limitBy.get(c.categoryId ?? -1) ?? null })),
-    daily,
-    upcomingAutopays: dueAutopays.map((a) => ({ ...a, createdAt: a.createdAt.toISOString(), updatedAt: a.updatedAt.toISOString(), dueOn: a.nextDueOn })),
+    daily: money.daily,
+    upcomingAutopays: upcoming.map(({ a, o }) => ({ ...a, createdAt: a.createdAt.toISOString(), updatedAt: a.updatedAt.toISOString(), dueOn: o.dueOn })),
     recent: recent.map(serializeTxn),
     reviewCount: review,
     lastSmsAt: lastSms?.toISOString() ?? null,

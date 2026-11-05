@@ -7,7 +7,7 @@ import { NativeSelect } from "@/components/native-select";
 import { RupeeInput } from "@/components/rupee-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { api, del, put } from "@/lib/api";
+import { api, del, post, put } from "@/lib/api";
 import { paiseToInput } from "@/lib/format";
 import { useLedgerMutation, useLoans } from "@/lib/queries";
 
@@ -24,7 +24,9 @@ export function FriendsSection({ txn, onDone }: { txn: Txn; onDone: () => void }
       <p className="flex items-center gap-2 text-sm font-medium">
         <Users className="size-4" /> Friends
       </p>
+      {splittable && txn.sharePaise === null && <LoanPart txn={txn} onDone={onDone} />}
       {splittable && <SplitPart txn={txn} onDone={onDone} />}
+      {!splittable && (txn.kind === "income" || txn.loanId) && !txn.transferGroupId && <LoanPart txn={txn} onDone={onDone} />}
       {!txn.transferGroupId && <PaybackPart txn={txn} onDone={onDone} />}
     </div>
   );
@@ -136,12 +138,62 @@ function SplitForm({ txn, initial, onDone, onCancel }: { txn: Txn; initial?: Spl
   );
 }
 
+/**
+ * This money *is* a loan: borrowed from a friend (money in) or lent to one (money out). It becomes neither
+ * income nor spending; their money back (or yours) is matched to it later. Shows the IOU it started.
+ */
+function LoanPart({ txn, onDone }: { txn: Txn; onDone: () => void }) {
+  const { data: loans } = useLoans();
+  const [naming, setNaming] = useState(false);
+  const [person, setPerson] = useState(txn.merchant ?? "");
+  const record = useLedgerMutation(() => put(`/transactions/${txn.id}/loan`, { person: person.trim() }), txn.direction === "credit" ? "Recorded as borrowed" : "Recorded as lent");
+  const unwind = useLedgerMutation((id: number) => post(`/loans/${id}/unwind`), "Not a loan any more");
+  const started = loans?.find((l) => l.txnId === txn.id);
+  const credit = txn.direction === "credit";
+
+  if (started) {
+    const left = started.principalPaise - started.paidPaise;
+    return (
+      <div className="flex items-center justify-between gap-2 text-sm">
+        <span>
+          {credit ? `Borrowed from ${started.person}` : `Lent to ${started.person}`}
+          <span className="text-muted-foreground"> · {left > 0 ? `${formatPaise(left)} left` : "paid back"}</span>
+        </span>
+        <Button type="button" size="sm" variant="ghost" className="text-muted-foreground" onClick={() => unwind.mutate(started.id, { onSuccess: onDone })}>
+          Not a loan
+        </Button>
+      </div>
+    );
+  }
+  if (txn.loanId) return null; // a payback: PaybackPart shows it
+  if (!naming) {
+    return (
+      <Button type="button" size="sm" variant="outline" onClick={() => setNaming(true)}>
+        {credit ? "Borrowed from a friend" : "Lent to a friend"}
+      </Button>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <Input value={person} onChange={(e) => setPerson(e.target.value)} placeholder="Friend's name" className="h-11 flex-1 md:h-9" aria-label="Friend's name" autoFocus />
+        <Button type="button" disabled={!person.trim() || record.isPending} onClick={() => record.mutate(undefined, { onSuccess: onDone })}>
+          Save
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {credit ? "Not income: you owe it back." : "Not spending: they owe it back."} When the money comes back by UPI, it's matched to this by name.
+      </p>
+    </div>
+  );
+}
+
 function PaybackPart({ txn, onDone }: { txn: Txn; onDone: () => void }) {
   const { data: loans } = useLoans();
   const [loanId, setLoanId] = useState<number | "">("");
   const link = useLedgerMutation(() => put(`/transactions/${txn.id}/repayment`, { loanId }), "Linked as a payback");
   const unlink = useLedgerMutation(() => del(`/transactions/${txn.id}/repayment`), "Unlinked");
-  const linked = loans?.find((l) => l.id === txn.loanId);
+  const linked = loans?.find((l) => l.id === txn.loanId && l.txnId !== txn.id);
 
   if (linked) {
     return (

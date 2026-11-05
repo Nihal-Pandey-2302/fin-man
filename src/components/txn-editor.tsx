@@ -236,7 +236,10 @@ function EditorForm({ target, onDone }: { target: EditorTarget; onDone: () => vo
               <AlertDialogHeader>
                 <AlertDialogTitle>Delete this transaction?</AlertDialogTitle>
                 <AlertDialogDescription>
-                  {formatPaise(target.txn.amountPaise)} · {target.txn.merchant ?? KIND_LABEL[target.txn.kind]}. If it came from an SMS, that SMS won't be re-imported.
+                  {formatPaise(target.txn.amountPaise)} · {target.txn.merchant ?? KIND_LABEL[target.txn.kind]}.{" "}
+                  {target.txn.source === "sms"
+                    ? "This money really moved, so balances count on it: deleting it can leave an account's balance wrong. If it isn't spending or income, use Friends → Borrowed / Lent, or change its type to a transfer instead."
+                    : "It's removed from every total."}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

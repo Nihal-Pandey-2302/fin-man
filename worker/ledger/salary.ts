@@ -11,6 +11,11 @@ export const inSalaryWindow = (date: string) => {
   return day >= 28 || day <= 7;
 };
 
+/** The seeded "Salary" category, if it exists. */
+export async function salaryCategoryId(db: Db): Promise<number | null> {
+  return (await db.select({ id: categories.id }).from(categories).where(eq(categories.name, "Salary")).get())?.id ?? null;
+}
+
 /**
  * Recognise a salary credit and start a new budget cycle from its date.
  * Salary = a credit the owner marked as salary, or (automatically) an income credit to the salary account
@@ -21,7 +26,9 @@ export async function detectSalary(db: Db, txnId: number): Promise<{ cycleId: nu
   const t = await db.select().from(transactions).where(eq(transactions.id, txnId)).get();
   if (!t || t.direction !== "credit" || t.transferGroupId) return null;
 
-  const explicit = t.kind === "income" && t.incomeSource === "salary";
+  // Marked as salary, or filed under the Salary category (by the owner or a merchant rule): that's explicit too.
+  const salaryCat = await salaryCategoryId(db);
+  const explicit = t.kind === "income" && (t.incomeSource === "salary" || (salaryCat !== null && t.categoryId === salaryCat));
   if (!explicit) {
     const [account, s] = await Promise.all([db.select().from(accounts).where(eq(accounts.id, t.accountId)).get(), getSettings(db)]);
     const employer = s.salary_employer.trim().toLowerCase();
@@ -35,7 +42,7 @@ export async function detectSalary(db: Db, txnId: number): Promise<{ cycleId: nu
       (!employer || (t.merchant ?? "").toLowerCase().includes(employer));
     if (!auto) return null;
   }
-  if (!explicit || t.categoryId === null || t.status !== "confirmed") {
+  if (t.incomeSource !== "salary" || t.categoryId === null || t.status !== "confirmed") {
     const salaryCat = t.categoryId ?? (await db.select({ id: categories.id }).from(categories).where(eq(categories.name, "Salary")).get())?.id ?? null;
     await db.update(transactions).set({ incomeSource: "salary", categoryId: salaryCat, status: "confirmed" }).where(eq(transactions.id, t.id));
   }

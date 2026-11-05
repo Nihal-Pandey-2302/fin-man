@@ -8,6 +8,7 @@ import type { Autopay, Loan } from "@shared/api";
 import { formatPaise, rupeesToPaise } from "@shared/money";
 import { formatShortDate, istDate } from "@shared/time";
 import { Money } from "@/components/money";
+import { FixedCosts } from "@/components/fixed-costs";
 import { GoalsCard } from "@/components/goals-card";
 import { RecurringSuggestions } from "@/components/recurring-suggestions";
 import { SalaryPlanCard } from "@/components/salary-plan-card";
@@ -76,6 +77,7 @@ function CycleCard() {
             <Stat label="Ends" value={formatShortDate(d.cycle.endDate)} />
           </div>
         )}
+        <FixedCosts />
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => setOpen(true)}>{d?.cycle.id ? "Edit budget" : "Set budget"}</Button>
           <Button variant="outline" onClick={() => setSalaryOpen(true)}>

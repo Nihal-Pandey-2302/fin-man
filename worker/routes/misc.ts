@@ -28,6 +28,7 @@ const settingsSchema = z
     notify_new_txns: z.boolean(),
     dismissed_recurring: z.array(z.string().max(120)).max(500),
     weekly_digest: z.boolean(),
+    fixed_costs: z.array(z.object({ name: z.string().trim().min(1).max(60), categoryId: z.number().int().positive(), amountPaise: z.number().int().positive() })).max(20),
   })
   .partial();
 
