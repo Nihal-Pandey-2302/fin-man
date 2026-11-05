@@ -8,6 +8,7 @@ import type { Db } from "../db";
 import { accounts, DIRECTIONS, INCOME_SOURCES, smsRaw, transactions, TXN_KINDS, TXN_STATUSES } from "../db/schema";
 import { unpairGroup } from "../ledger/matcher";
 import { unmatchAutopay } from "../ledger/autopays";
+import { lateAfterCorrection } from "../ledger/late-sms";
 import { linkRepayment, LoanError, recordLoan, splitOf, splitTxn, unlinkRepayment, unrecordLoan, unsplitTxn } from "../ledger/loans";
 import { detectSalary, salaryCategoryId, unlinkSalary } from "../ledger/salary";
 import { adoptManualTwin, findOpenLeg } from "../ledger/twins";
@@ -359,11 +360,12 @@ export const transferRoutes = new Hono<AppEnv>()
 export const reviewRoutes = new Hono<AppEnv>()
   .get("/", async (c) => {
     const db = c.var.db;
-    const [txns, sms] = await Promise.all([
+    const [txns, sms, lateSms] = await Promise.all([
       db.select().from(transactions).where(eq(transactions.status, "needs_review")).orderBy(desc(transactions.occurredAt)).limit(200).all(),
       db.select().from(smsRaw).where(inArray(smsRaw.parseStatus, ["unparsed", "error"])).orderBy(desc(smsRaw.receivedAt)).limit(100).all(),
+      lateAfterCorrection(db),
     ]);
-    return c.json({ transactions: txns, sms });
+    return c.json({ transactions: txns, sms, lateSms });
   })
   .post("/sms/:id/reprocess", idParam, async (c) => {
     const db = c.var.db;

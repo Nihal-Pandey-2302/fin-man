@@ -1,9 +1,9 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowLeftRight, Check, MessageSquareWarning, Pencil, RotateCw, Users, X } from "lucide-react";
+import { ArrowLeftRight, Check, Clock, MessageSquareWarning, Pencil, RotateCw, Users, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { toast } from "sonner";
-import type { Review, Sms, Txn } from "@shared/api";
+import type { LateSms, Review, Sms, Txn } from "@shared/api";
 import { formatPaise } from "@shared/money";
 import { formatDay, formatTime } from "@shared/time";
 import { CategoryBadge, CategoryPicker } from "@/components/category-picker";
@@ -21,7 +21,7 @@ import { invalidateLedger, keys, useLoans, useLookups, useReview } from "@/lib/q
 import { relativeTime } from "@/lib/relative";
 import { load } from "@/lib/storage";
 
-type Item = { kind: "txn"; txn: Txn } | { kind: "pair"; legs: Txn[] } | { kind: "loan"; loanId: number; legs: Txn[] };
+type Item = { kind: "late"; txn: Txn; late: LateSms } | { kind: "txn"; txn: Txn } | { kind: "pair"; legs: Txn[] } | { kind: "loan"; loanId: number; legs: Txn[] };
 
 export default function ReviewPage() {
   const { data, isPending } = useReview();
@@ -33,7 +33,14 @@ export default function ReviewPage() {
     const out: Item[] = [];
     const seen = new Set<string>();
     const seenLoans = new Set<number>();
+    const late = new Map((data?.lateSms ?? []).map((l) => [l.transactionId, l]));
     for (const t of data?.transactions ?? []) {
+      // Arrived just after a hand-set balance: settle that first (it may be a leg of a pair or a loan too).
+      const l = late.get(t.id);
+      if (l) {
+        out.push({ kind: "late", txn: t, late: l });
+        continue;
+      }
       // A short loan found automatically: the money and its payback, decided together.
       if (t.loanId && !t.transferGroupId) {
         if (seenLoans.has(t.loanId)) continue;
@@ -85,6 +92,15 @@ export default function ReviewPage() {
     invalidateLedger(qc);
   }
 
+  /** The hand-set balance already had this one: count that balance from just after it. */
+  async function alreadyIncluded(l: LateSms) {
+    await post(`/accounts/${l.accountId}/balance/already-included`, { transactionId: l.transactionId });
+    toast.success(`Kept the ${formatPaise(l.correctedPaise)} you set`);
+  }
+
+  /** Confirm a single transaction, asking for a category first when an expense has none. */
+  const confirmOne = (t: Txn, categoryId?: number | null) => (categoryId === undefined && !t.categoryId && t.kind === "expense" ? setPicking(t) : confirm([t.id], categoryId));
+
   async function unpair(groupId: string) {
     await post(`/transfers/${groupId}/unpair`);
     invalidateLedger(qc);
@@ -106,7 +122,24 @@ export default function ReviewPage() {
       )}
 
       {items.map((item) =>
-        item.kind === "loan" ? (
+        item.kind === "late" ? (
+          <LateCard
+            key={`late-${item.txn.id}`}
+            txn={item.txn}
+            late={item.late}
+            onNew={() => confirmOne(item.txn)}
+            onIncluded={async () => {
+              try {
+                await alreadyIncluded(item.late);
+                invalidateLedger(qc);
+                confirmOne(item.txn);
+              } catch {
+                toast.error("Couldn't update the balance. Try again.");
+                invalidateLedger(qc);
+              }
+            }}
+          />
+        ) : item.kind === "loan" ? (
           <LoanCard key={`loan-${item.loanId}`} legs={item.legs} onConfirm={() => confirm(item.legs.map((l) => l.id))} onNotLoan={() => notLoan(item.loanId)} />
         ) : item.kind === "pair" ? (
           <PairCard key={item.legs[0].transferGroupId} legs={item.legs} onConfirm={() => confirm(item.legs.map((l) => l.id))} onUnpair={() => unpair(item.legs[0].transferGroupId!)} />
@@ -114,7 +147,7 @@ export default function ReviewPage() {
           <ReviewCard
             key={item.txn.id}
             txn={item.txn}
-            onConfirm={(categoryId) => (categoryId === undefined && !item.txn.categoryId && item.txn.kind === "expense" ? setPicking(item.txn) : confirm([item.txn.id], categoryId))}
+            onConfirm={(categoryId) => confirmOne(item.txn, categoryId)}
             onEdit={() => setEditing({ mode: "edit", txn: item.txn })}
             onPick={() => setPicking(item.txn)}
             onLoan={() => asLoan(item.txn)}
@@ -214,6 +247,46 @@ function ReviewCard({
 }
 
 /** "Short loan with Arjun?": money in from a person and back to them within days (or the other way round). */
+/**
+ * This bank's SMS gives only the day, so the app can't tell whether the money moved before or after the
+ * balance was set by hand a few minutes earlier. The owner can: they saw the bank's figure.
+ */
+function LateCard({ txn, late, onNew, onIncluded }: { txn: Txn; late: LateSms; onNew: () => void; onIncluded: () => void }) {
+  const { account } = useLookups();
+  const acc = account(txn.accountId);
+  const mins = Math.max(1, Math.round((new Date(txn.occurredAt).getTime() - new Date(late.correctedAt).getTime()) / 60_000));
+  return (
+    <Card>
+      <CardContent className="space-y-3">
+        <div className="flex items-start gap-3">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted">
+            <Clock className="size-4" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="font-medium">Already in the {formatPaise(late.correctedPaise)} you set?</p>
+            <p className="text-sm">
+              {txn.direction === "credit" ? "+" : "−"}
+              {formatPaise(txn.amountPaise)} · {txnTitle(txn)} · {acc?.name}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              This SMS reached your phone {mins} min after you set the {acc?.name ?? "account"} balance, and it doesn't say what time the money moved. If the bank already
+              showed it, it would be counted twice.
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={onNew}>
+            It's new
+          </Button>
+          <Button size="sm" className="ml-auto" onClick={onIncluded}>
+            <Check /> Already included
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function LoanCard({ legs, onConfirm, onNotLoan }: { legs: Txn[]; onConfirm: () => void; onNotLoan: () => void }) {
   const { account } = useLookups();
   const { data: loans } = useLoans();

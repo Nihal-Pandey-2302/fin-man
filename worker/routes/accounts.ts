@@ -6,6 +6,7 @@ import type { Account } from "../../shared/api";
 import type { Db } from "../db";
 import { ACCOUNT_KINDS, ACCOUNT_ROLES, accountNumbers, accounts, autopays, INSTITUTIONS, transactions } from "../db/schema";
 import { computeBalances } from "../ledger/balances";
+import { lateAfterCorrection } from "../ledger/late-sms";
 import { reprocessUnparsed } from "../sms/ingest";
 import type { AppEnv } from "../types";
 import { dayOfMonth, idParam, instant, paise, signedPaise, text } from "./validators";
@@ -96,6 +97,23 @@ export const accountRoutes = new Hono<AppEnv>()
       .where(eq(accounts.id, id))
       .returning({ id: accounts.id });
     return updated.length ? c.json({ id }) : c.json({ error: "not_found" }, 404);
+  })
+  /**
+   * "The balance I set already had this one": a late SMS (see late-sms.ts). The hand-set figure now counts
+   * from just after it, so it isn't taken off twice.
+   */
+  .post("/:id/balance/already-included", idParam, zValidator("json", z.object({ transactionId: z.number().int().positive() })), async (c) => {
+    const { id } = c.req.valid("param");
+    const { transactionId } = c.req.valid("json");
+    const db = c.var.db;
+    const [late] = await lateAfterCorrection(db, transactionId);
+    if (!late || late.accountId !== id) return c.json({ error: "not_late" }, 409);
+    const txn = (await db.select({ occurredAt: transactions.occurredAt }).from(transactions).where(eq(transactions.id, transactionId)).get())!;
+    await db
+      .update(accounts)
+      .set({ openingBalanceAt: new Date(txn.occurredAt.getTime() + 1) })
+      .where(eq(accounts.id, id));
+    return c.json({ id });
   })
   .delete("/:id", idParam, async (c) => {
     const { id } = c.req.valid("param");

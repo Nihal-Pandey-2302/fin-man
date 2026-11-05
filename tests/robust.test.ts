@@ -167,3 +167,42 @@ describe("salary, card bills, forwarding, balances", () => {
     void env;
   });
 });
+
+describe("an SMS that lands just after a hand-set balance", () => {
+  // HDFC's UPI alerts give only the day: the debit takes the time it reached the phone, minutes after it happened.
+  const sms = fixture("hdfc/upi_debit.txt"); // ₹520 on 27 Oct
+  const oct = (h: number, min: number) => istToUtc(2026, 10, 27, h, min);
+  const setBalance = (id: number, paise: number, when: Date) => db.update(schema.accounts).set({ openingBalancePaise: paise, openingBalanceAt: when }).where(eq(schema.accounts.id, id));
+  const balance = async (id: number) => (await json<{ id: number; balance: { balancePaise: number } }[]>(api("/accounts"))).find((a) => a.id === id)!.balance.balancePaise;
+  const review = () => json<{ transactions: Txn[]; lateSms: { transactionId: number; accountId: number; correctedPaise: number }[] }>(api("/review"));
+
+  it("asks whether the balance already had it, and keeps the figure the owner set when it did", async () => {
+    const { hdfc } = await seedAccounts();
+    await setBalance(hdfc.id, 8_000_000, oct(20, 19));
+    const out = await json<{ transactionId: number }>(postSms("JK-HDFCBK-S", sms, oct(20, 22).toISOString()));
+    expect((await txn(out.transactionId)).status).toBe("needs_review");
+    expect((await review()).lateSms).toEqual([{ transactionId: out.transactionId, accountId: hdfc.id, correctedPaise: 8_000_000, correctedAt: oct(20, 19).toISOString() }]);
+    expect(await balance(hdfc.id)).toBe(8_000_000 - 52_000);
+
+    const res = await api(`/accounts/${hdfc.id}/balance/already-included`, { method: "POST", json: { transactionId: out.transactionId } });
+    expect(res.status).toBe(200);
+    expect(await balance(hdfc.id)).toBe(8_000_000);
+    expect((await review()).lateSms).toEqual([]);
+    // Once is enough: it's no longer "just after" the balance.
+    expect((await api(`/accounts/${hdfc.id}/balance/already-included`, { method: "POST", json: { transactionId: out.transactionId } })).status).toBe(409);
+  });
+
+  it("leaves SMS alone that arrive much later, or whose time is a guess (another day)", async () => {
+    const { hdfc } = await seedAccounts();
+    await setBalance(hdfc.id, 8_000_000, oct(18, 0));
+    const later = await json<{ transactionId: number }>(postSms("JK-HDFCBK-S", sms, oct(19, 0).toISOString()));
+    expect((await review()).lateSms).toEqual([]);
+    expect(await balance(hdfc.id)).toBe(8_000_000 - 52_000);
+    // A different day in the SMS than the day it arrived: the time is a guess (noon), not the arrival time.
+    await setBalance(hdfc.id, 8_000_000, oct(19, 30));
+    await postSms("JK-HDFCBK-S", sms.replace("27/10/26", "26/10/26"), oct(19, 35).toISOString());
+    expect((await review()).lateSms).toEqual([]);
+    // Not late: the first one stays as it was.
+    expect((await api(`/accounts/${hdfc.id}/balance/already-included`, { method: "POST", json: { transactionId: later.transactionId } })).status).toBe(409);
+  });
+});

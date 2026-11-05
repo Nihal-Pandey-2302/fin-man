@@ -174,7 +174,9 @@ export type Bootstrap = {
 
 export type Page<T> = { items: T[]; nextCursor: string | null };
 
-export type Review = { transactions: Txn[]; sms: Sms[] };
+/** A transaction whose SMS (no time of day) arrived just after a hand-set balance: was it already in it? */
+export type LateSms = { transactionId: number; accountId: number; correctedPaise: number; correctedAt: string };
+export type Review = { transactions: Txn[]; sms: Sms[]; lateSms: LateSms[] };
 
 export type SalaryPlan = {
   cycleStart: string;

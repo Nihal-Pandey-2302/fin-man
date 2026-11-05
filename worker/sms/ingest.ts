@@ -2,6 +2,7 @@ import { and, eq, isNull, like, notLike, or } from "drizzle-orm";
 import type { Db } from "../db";
 import { accountNumbers, accounts, smsRaw, transactions } from "../db/schema";
 import { applyAutopayNotice } from "../ledger/autopays";
+import { lateAfterCorrection } from "../ledger/late-sms";
 import { adoptManualTwin } from "../ledger/twins";
 import { settleNewTransaction } from "../ledger/settle";
 import { bumpRuleHits, findRule, loadRules } from "../ledger/rules";
@@ -152,6 +153,10 @@ export async function processSms(db: Db, row: SmsRow): Promise<IngestOutcome> {
   if (!txn) return { status: "duplicate", smsId: row.id };
   if (rule) await bumpRuleHits(db, rule.id);
   await settleNewTransaction(db, txn.id);
+  // Arrived just after a hand-set balance with no time of day: ask whether that balance already had it.
+  if ((await lateAfterCorrection(db, txn.id)).length) {
+    await db.update(transactions).set({ status: "needs_review" }).where(eq(transactions.id, txn.id));
+  }
   return { status: "created", smsId: row.id, transactionId: txn.id };
 }
 
